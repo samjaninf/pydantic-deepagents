@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **`deps.todos` not synchronized with todo tools** — `create_todo_toolset()` was called without `storage=` parameter, creating an isolated `TodoStorage` disconnected from `deps.todos`. Todo tools wrote to their own internal list while `deps.todos`, `get_todo_prompt()`, and `share_todos` remained empty. Fixed with `_DepsTodoProxy` pattern that delegates reads/writes to `deps.todos` at runtime. Subagent todo toolsets use the same proxy pattern for consistency. ([#35](https://github.com/vstorm-co/pydantic-deepagents/issues/35))
+- **`Model` objects discarded for subagents** — `isinstance(model, str)` guard silently replaced `Model` objects (e.g. `TestModel()`, `AnthropicModel()`) with `DEFAULT_MODEL`. Subagents always used `openai:gpt-4.1` regardless of the model passed to `create_deep_agent()`. Changed to `model or DEFAULT_MODEL`. ([#34](https://github.com/vstorm-co/pydantic-deepagents/pull/34), by [@ret2libc](https://github.com/ret2libc))
+- **Binary file upload tests flaky on Linux** — `chardet` detected encoding for small byte sequences on Linux but not macOS, causing `line_count` assertions to fail in CI. Tests now mock `chardet.detect` for deterministic behavior.
+
+### Changed
+
+- Updated `subagents-pydantic-ai` dependency to `>=0.0.8` — accepts `Model` objects in `create_subagent_toolset()` and fixes `ask_parent` in async mode
 
 ## [0.2.18] - 2026-02-27
 
