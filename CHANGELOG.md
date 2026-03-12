@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.2.20] - 2026-03-11
 
+### Fixed
+
+- **CLI: multi-byte UTF-8 input garbled in raw mode** — Chinese, Japanese, Korean and other multi-byte characters appeared as replacement characters when typed in interactive mode. `_read_raw_key()` now reads the full UTF-8 byte sequence before decoding. ([#38](https://github.com/vstorm-co/pydantic-deepagents/pull/38), by [@huapingchen](https://github.com/huapingchen))
+
 ### Changed
 
 - Updated `pydantic-ai-backend` dependency to `>=0.1.14` — `DockerSandbox` now resolves relative paths against `work_dir` instead of `/`, and returns clean error messages for missing files ([pydantic-ai-backend#22](https://github.com/vstorm-co/pydantic-ai-backend/pull/22), by [@ret2libc](https://github.com/ret2libc))
