@@ -845,6 +845,11 @@ def create_deep_agent(  # noqa: C901
             if console_prompt:
                 parts.append(console_prompt)
 
+        if include_skills and skills_toolset:
+            skills_instructions = skills_toolset.get_instructions(ctx)
+            if skills_instructions:
+                parts.append(skills_instructions)
+
         if include_subagents:
             # Build configs list for prompt generation
             prompt_configs: list[SubAgentConfig] = list(effective_subagents or [])

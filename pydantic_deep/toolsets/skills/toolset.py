@@ -454,7 +454,7 @@ class SkillsToolset(FunctionToolset):
 
             return str(await script.run(ctx=ctx, args=args))
 
-    async def get_instructions(self, ctx: RunContext[Any]) -> str | None:
+    def get_instructions(self, ctx: RunContext[Any]) -> str | None:
         """Return instructions to inject into the agent's system prompt.
 
         Args:
