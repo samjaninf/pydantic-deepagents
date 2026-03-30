@@ -15,7 +15,7 @@ from rich.panel import Panel
 from rich.syntax import Syntax
 from rich.text import Text
 
-from cli.theme import get_glyphs, get_theme
+from apps.cli.theme import get_glyphs, get_theme
 
 
 class SimpleCodeBlock(CodeBlock):
@@ -73,7 +73,7 @@ def print_welcome_banner(
     working_dir: str | None = None,
 ) -> None:
     """Print a styled welcome banner with version, model, and context info."""
-    from cli.local_context import (
+    from apps.cli.local_context import (
         detect_language,
         detect_package_manager,
         detect_runtimes,

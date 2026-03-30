@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from cli.config import (
+from apps.cli.config import (
     CliConfig,
     _apply_env_overrides,
     _coerce_value,

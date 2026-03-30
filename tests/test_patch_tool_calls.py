@@ -321,9 +321,6 @@ class TestPatchToolCallsProcessor:
                         )  # pragma: no cover
 
 
-# --- Integration with create_deep_agent ---
-
-
 class TestCreateDeepAgentPatchToolCalls:
     def test_patch_tool_calls_true(self):
         """Agent with patch_tool_calls=True has the processor."""
@@ -362,9 +359,6 @@ class TestCreateDeepAgentPatchToolCalls:
         processors = agent.history_processors
         # patch_tool_calls_processor should be first
         assert processors[0] is ptp
-
-
-# --- Exports ---
 
 
 class TestPatchExports:

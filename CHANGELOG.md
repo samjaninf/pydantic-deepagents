@@ -5,6 +5,59 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-03-30
+
+### Breaking Changes
+
+- **Full migration to pydantic-ai Capabilities API** (requires `pydantic-ai>=1.71.0`)
+- Removed `pydantic-ai-middleware` dependency entirely — replaced by `pydantic-ai-shields>=0.3.0`
+- `HooksMiddleware` renamed to `HooksCapability` (extends `AbstractCapability`), moved from `pydantic_deep.middleware.hooks` to `pydantic_deep.capabilities.hooks`
+- `CheckpointMiddleware` now extends `AbstractCapability` instead of `AgentMiddleware`
+- Removed `LoopDetectionMiddleware` old API — now extends `AbstractCapability`
+- Removed `web_search_provider`, `permission_handler`, `middleware_context` params from `create_deep_agent()`
+- Removed `toolsets/web.py` — use pydantic-ai built-in `WebSearch()` and `WebFetch()` instead
+- Removed ALL old middleware exports from `__init__.py` (`AgentMiddleware`, `MiddlewareAgent`, `MiddlewareChain`, etc.)
+- Removed deprecated types: `LegacySkill`, `SkillFrontmatter`, `SkillDirectory`
+- Tool hook method names changed: `before_tool_call` → `before_tool_execute`, `after_tool_call` → `after_tool_execute`, `on_tool_error` → `on_tool_execute_error`
+- Deny semantics changed: `ToolPermissionResult(DENY)` → `raise ModelRetry("reason")`
+- Moved `cli/` to `apps/cli/` — import paths changed from `cli.` to `apps.cli.`
+- Removed `apps/harbor_agent/` and `apps/swebench_agent/`
+
+### Added
+
+- 5 internal capabilities: `SkillsCapability`, `ContextFilesCapability`, `MemoryCapability`, `TeamCapability`, `PlanCapability`
+- **`DeepAgent`** and **`DeepAgentSpec`** — declarative YAML/JSON agent specs via `DeepAgent.from_file("agent.yaml")` and `DeepAgent.from_spec({...})`
+- `on_eviction` callback on `EvictionProcessor` — notifies when tool output is saved to file
+- `on_before_compress`, `on_after_compress` callbacks forwarded through `create_deep_agent()`
+- CLI observability: compression start notice, eviction notice, active tasks in status bar
+- **Teams + subagents integration** — `create_team_toolset()` accepts `registry`, `task_fn`, `task_manager`, `agent_factory` to delegate team member execution to the subagent engine. `spawn_team` registers members as subagents, `assign_task` runs them via `task()` in async mode
+- Capabilities-first architecture: everything is now an `AbstractCapability`
+
+### Changed
+
+- `CostTracking` from `pydantic-ai-shields` replaces `CostTrackingMiddleware`
+- `ContextManagerCapability` from `pydantic-ai-summarization` replaces `ContextManagerMiddleware`
+- All capabilities use `before_tool_execute`/`after_tool_execute` instead of old `before_tool_call`/`after_tool_call`
+- Web tools now use pydantic-ai built-in `WebSearch()` and `WebFetch()` capabilities
+- Requires `subagents-pydantic-ai>=0.2.0` (custom agent support)
+
+### Fixed
+
+- **`examples/full_app`**: `DeepAgentDeps` was passed `checkpoint_store=` which is not a valid field — removed ([#40](https://github.com/vstorm-co/pydantic-deepagents/issues/40))
+- **Skills URI leak in sandbox** — skill URIs (host filesystem paths) were exposed in system prompt and `load_skill` output, causing agents in Docker sandboxes to attempt `read_file` on non-existent paths. URIs are now omitted from prompts — agents use `load_skill`/`read_skill_resource` tools instead ([#43](https://github.com/vstorm-co/pydantic-deepagents/issues/43))
+- **`examples/full_app`**: Updated from old middleware API to capabilities (`AuditCapability`, `PermissionCapability`)
+- **`apps/deepresearch`**: Updated from old middleware API to capabilities
+
+### Removed
+
+- `pydantic_deep/middleware/` directory (hooks moved to `pydantic_deep/capabilities/hooks.py`)
+- `pydantic_deep/toolsets/web.py` (replaced by pydantic-ai built-in)
+- `apps/harbor_agent/`, `apps/swebench_agent/`
+- `tests/test_web_toolset.py`, `tests/test_cost_tracking.py`, `tests/test_middleware_integration.py`
+- Old middleware exports: `AgentMiddleware`, `MiddlewareAgent`, `MiddlewareChain`, `MiddlewareContext`, `PermissionHandler`, `ToolDecision`, `ToolPermissionResult`, `CostTrackingMiddleware`, `CostCallback`, `create_cost_tracking_middleware`, `UsageCallback`, `create_context_manager_middleware`, `before_run`, `after_run`, `before_model_request`, `before_tool_call`, `after_tool_call`, `on_tool_error`, `on_error`
+- Deprecated types: `LegacySkill`, `SkillFrontmatter`, `SkillDirectory`
+- `web-tools` optional dependency group
+
 ## [0.2.21] - 2026-03-19
 
 ### Fixed

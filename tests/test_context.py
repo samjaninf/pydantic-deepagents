@@ -22,9 +22,6 @@ from pydantic_deep.toolsets.context import _truncate_content
 TEST_MODEL = TestModel()
 
 
-# --- Helpers ---
-
-
 def _make_ctx(backend: StateBackend | None = None) -> RunContext[DeepAgentDeps]:
     """Create a RunContext with DeepAgentDeps for testing."""
     b = backend or StateBackend()
@@ -36,9 +33,6 @@ def _make_ctx(backend: StateBackend | None = None) -> RunContext[DeepAgentDeps]:
     )
 
 
-# --- Unit Tests: ContextFile ---
-
-
 class TestContextFile:
     """Tests for ContextFile dataclass."""
 
@@ -48,9 +42,6 @@ class TestContextFile:
         assert cf.name == "DEEP.md"
         assert cf.path == "/DEEP.md"
         assert cf.content == "# Hello"
-
-
-# --- Unit Tests: load_context_files ---
 
 
 class TestLoadContextFiles:
@@ -119,9 +110,6 @@ class TestLoadContextFiles:
         assert files[0].path == "/project/config/DEEP.md"
 
 
-# --- Unit Tests: discover_context_files ---
-
-
 class TestDiscoverContextFiles:
     """Tests for discover_context_files function."""
 
@@ -175,9 +163,6 @@ class TestDiscoverContextFiles:
         assert found == ["/project/AGENT.md"]
 
 
-# --- Unit Tests: _truncate_content ---
-
-
 class TestTruncateContent:
     """Tests for _truncate_content helper."""
 
@@ -214,9 +199,6 @@ class TestTruncateContent:
         # Tail: 30% of 500 = 150 chars
         assert result[-150:] == "T" * 150
         assert "[500 chars truncated]" in result
-
-
-# --- Unit Tests: format_context_prompt ---
 
 
 class TestFormatContextPrompt:
@@ -301,9 +283,6 @@ class TestFormatContextPrompt:
         ]
         result = format_context_prompt(files, is_subagent=False)
         assert "### SOUL.md" in result
-
-
-# --- Unit Tests: ContextToolset ---
 
 
 class TestContextToolset:
@@ -412,9 +391,6 @@ class TestContextToolset:
         assert result is None
 
 
-# --- Integration Tests: create_deep_agent ---
-
-
 class TestCreateDeepAgentContext:
     """Tests for create_deep_agent with context parameters."""
 
@@ -452,9 +428,6 @@ class TestCreateDeepAgentContext:
             output_type=Result,
         )
         assert agent is not None
-
-
-# --- Per-Subagent Context Tests ---
 
 
 class TestPerSubagentContext:
@@ -549,9 +522,6 @@ class TestPerSubagentContext:
         )
         # is_subagent defaults to False — no filtering
         assert config_toolset._is_subagent is False
-
-
-# --- Constants Tests ---
 
 
 class TestContextConstants:

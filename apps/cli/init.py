@@ -10,7 +10,6 @@ import shutil
 from pathlib import Path
 
 _AGENT_MD_TEMPLATE = """\
-# Project Context
 
 Describe your project here. This file is read by pydantic-deep at startup
 to understand the project context.
@@ -25,7 +24,6 @@ to understand the project context.
 """
 
 _MEMORY_MD_TEMPLATE = """\
-# Agent Memory
 
 This file is automatically maintained by pydantic-deep.
 The agent reads and updates this file across sessions.

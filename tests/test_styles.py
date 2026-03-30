@@ -39,9 +39,6 @@ def _minimal_agent(**kwargs: Any) -> Any:
     return create_deep_agent(**defaults)  # type: ignore[call-overload]
 
 
-# --- OutputStyle dataclass ---
-
-
 class TestOutputStyle:
     """Tests for OutputStyle dataclass."""
 
@@ -62,9 +59,6 @@ class TestOutputStyle:
         """OutputStyle works with empty description."""
         style = OutputStyle(name="test", description="", content="content")
         assert style.description == ""
-
-
-# --- Built-in styles ---
 
 
 class TestBuiltinStyles:
@@ -105,9 +99,6 @@ class TestBuiltinStyles:
         assert BUILTIN_STYLES["explanatory"] is EXPLANATORY_STYLE
         assert BUILTIN_STYLES["formal"] is FORMAL_STYLE
         assert BUILTIN_STYLES["conversational"] is CONVERSATIONAL_STYLE
-
-
-# --- Resolve style ---
 
 
 class TestResolveStyle:
@@ -179,9 +170,6 @@ class TestResolveStyle:
             resolve_style("missing", styles_dir=str(tmp_path))
 
 
-# --- Load from file ---
-
-
 class TestLoadStyleFromFile:
     """Tests for load_style_from_file function."""
 
@@ -230,9 +218,6 @@ class TestLoadStyleFromFile:
         f.write_text("---\nname: strpath\n---\n\nContent.", encoding="utf-8")
         style = load_style_from_file(str(f))
         assert style.name == "strpath"
-
-
-# --- Discover styles ---
 
 
 class TestDiscoverStyles:
@@ -289,9 +274,6 @@ class TestDiscoverStyles:
         assert "s" in styles
 
 
-# --- Format style prompt ---
-
-
 class TestFormatStylePrompt:
     """Tests for format_style_prompt function."""
 
@@ -312,9 +294,6 @@ class TestFormatStylePrompt:
         style = OutputStyle(name="t", description="", content="Line 1\nLine 2")
         result = format_style_prompt(style)
         assert "Line 1\nLine 2" in result
-
-
-# --- Integration with create_deep_agent ---
 
 
 class TestCreateDeepAgentWithStyle:
@@ -394,20 +373,16 @@ class TestCreateDeepAgentWithStyle:
         static2 = self._get_static_instructions(agent2)
         assert static1 == static2
 
-    def test_style_with_middleware(self) -> None:
-        """Style works when middleware wrapping is active."""
+    def test_style_with_capabilities(self) -> None:
+        """Style works when capabilities are active."""
         agent = _minimal_agent(
             output_style="concise",
             cost_tracking=True,
             context_manager=True,
         )
-        # MiddlewareAgent wraps the original agent
-        assert hasattr(agent, "wrapped")
-        static = self._get_static_instructions(agent.wrapped)
+        # Agent with capabilities (no wrapping needed)
+        static = self._get_static_instructions(agent)
         assert "## Output Style: concise" in static
-
-
-# --- Exports ---
 
 
 class TestStyleExports:

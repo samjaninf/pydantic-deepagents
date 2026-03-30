@@ -10,7 +10,7 @@ from __future__ import annotations
 import difflib
 from pathlib import PurePath
 
-from cli.theme import get_glyphs, get_theme
+from apps.cli.theme import get_glyphs, get_theme
 
 
 def _escape_markup(text: str) -> str:
@@ -150,9 +150,7 @@ def render_write_approval(path: str, content: str) -> str:
     return f"{header}{lang_tag}\n{preview}"
 
 
-# ---------------------------------------------------------------------------
 # Inline change previews (shown after tool execution)
-# ---------------------------------------------------------------------------
 
 _INLINE_MAX_LINES = 12
 

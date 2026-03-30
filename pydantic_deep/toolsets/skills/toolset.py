@@ -58,7 +58,6 @@ Use progressive disclosure: load only what you need, when you need it."""
 LOAD_SKILL_TEMPLATE = """<skill>
 <name>{skill_name}</name>
 <description>{description}</description>
-<uri>{uri}</uri>
 
 <resources>
 {resources_list}
@@ -382,7 +381,6 @@ class SkillsToolset(FunctionToolset):
             return LOAD_SKILL_TEMPLATE.format(
                 skill_name=skill.name,
                 description=skill.description,
-                uri=skill.uri or "N/A",
                 resources_list=resources_list,
                 scripts_list=scripts_list,
                 content=skill.content,
@@ -472,8 +470,6 @@ class SkillsToolset(FunctionToolset):
             skills_list_lines.append("<skill>")
             skills_list_lines.append(f"<name>{skill.name}</name>")
             skills_list_lines.append(f"<description>{skill.description}</description>")
-            if skill.uri:
-                skills_list_lines.append(f"<uri>{skill.uri}</uri>")
             skills_list_lines.append("</skill>")
         skills_list = "\n".join(skills_list_lines)
 

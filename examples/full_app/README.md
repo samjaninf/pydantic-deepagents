@@ -117,7 +117,7 @@ Click the **Config** tab in the sidebar to view all active features, hooks, midd
 ```
 full_app/
 ├── app.py                  # FastAPI backend with all features wired
-├── audit_middleware.py      # AuditMiddleware + PermissionMiddleware
+├── audit_middleware.py      # AuditCapability + PermissionCapability
 ├── github_tools.py          # Mock GitHub tools (FunctionToolset)
 ├── skills/
 │   ├── data-analysis/
@@ -255,9 +255,9 @@ Add more `SubAgentConfig` entries to the `SUBAGENT_CONFIGS` list in `app.py`.
 
 Add more `Hook` entries to the `HOOKS` list in `app.py`.
 
-### Adding Middleware
+### Adding Capabilities
 
-Create a new class extending `AgentMiddleware[DeepAgentDeps]` and add it to the `middleware` list.
+Create a new class extending `AbstractCapability[DeepAgentDeps]` and add it to the `middleware` list in `create_deep_agent()`.
 
 ### Using Pre-configured Runtimes
 

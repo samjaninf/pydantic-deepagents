@@ -20,9 +20,9 @@ Processors:
 - SlidingWindowProcessor (conversation length management)
 - PatchToolCallsProcessor (orphaned tool call repair)
 
-Middleware & Hooks:
-- AuditMiddleware (tool usage tracking)
-- PermissionMiddleware (sensitive path blocking)
+Capabilities & Hooks:
+- AuditCapability (tool usage tracking)
+- PermissionCapability (sensitive path blocking)
 - Hook: audit_logger (POST_TOOL_USE, background)
 - Hook: safety_gate (PRE_TOOL_USE, blocks dangerous commands)
 
@@ -51,8 +51,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-# Import our custom tools and middleware
-from audit_middleware import AuditMiddleware, PermissionMiddleware
+from audit_middleware import AuditCapability, PermissionCapability
 from fastapi import FastAPI, File, HTTPException, Query, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -114,7 +113,6 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
-# Silence noisy libraries
 for _lib in (
     "chardet",
     "charset_normalizer",
@@ -126,7 +124,6 @@ for _lib in (
 ):
     logging.getLogger(_lib).setLevel(logging.WARNING)
 
-# Paths
 APP_DIR = Path(__file__).parent
 WORKSPACE_DIR = APP_DIR / "workspace"
 WORKSPACES_DIR = APP_DIR / "workspaces"  # Per-session persistent storage
@@ -138,11 +135,6 @@ WORKSPACE_DIR.mkdir(exist_ok=True)
 WORKSPACES_DIR.mkdir(exist_ok=True)
 
 
-# ---------------------------------------------------------------------------
-# Attachment helpers
-# ---------------------------------------------------------------------------
-
-# Extensions we can safely decode as text for preview
 _TEXT_EXTS = {
     "txt",
     "md",
@@ -243,11 +235,6 @@ def _build_file_summary(name: str, path: str, data: bytes, media_type: str) -> s
     return summary
 
 
-# ---------------------------------------------------------------------------
-# Session state
-# ---------------------------------------------------------------------------
-
-
 @dataclass
 class UserSession:
     """Per-user session state."""
@@ -305,9 +292,7 @@ session_manager: SessionManager | None = None
 user_sessions: dict[str, UserSession] = {}  # session_id -> UserSession
 
 
-# ---------------------------------------------------------------------------
 # Hooks (Claude Code-style lifecycle hooks)
-# ---------------------------------------------------------------------------
 
 
 async def audit_logger_handler(hook_input: HookInput) -> HookResult:
@@ -369,18 +354,12 @@ HOOKS = [
 ]
 
 
-# ---------------------------------------------------------------------------
-# Middleware (pydantic-ai-middleware integration)
-# ---------------------------------------------------------------------------
+# Capabilities (pydantic-ai Capabilities API)
 
 # Module-level instances so app.py and WebSocket handler can access stats
-audit_mw = AuditMiddleware()
-permission_mw = PermissionMiddleware()
+audit_cap = AuditCapability()
+permission_cap = PermissionCapability()
 
-
-# ---------------------------------------------------------------------------
-# Subagent configurations
-# ---------------------------------------------------------------------------
 
 SUBAGENT_CONFIGS: list[SubAgentConfig] = [
     {
@@ -435,16 +414,13 @@ Format your review as:
 ]
 
 
-# ---------------------------------------------------------------------------
 # Programmatic skills (Skill dataclass instances)
-# ---------------------------------------------------------------------------
 
 PROGRAMMATIC_SKILLS = [
     Skill(
         name="quick-reference",
         description="Quick reference card for workspace commands and shortcuts",
         content="""\
-# Quick Reference
 
 ## File Operations
 - `read_file(path)` — Read a file (use offset/limit for large files)
@@ -475,9 +451,7 @@ PROGRAMMATIC_SKILLS = [
 ]
 
 
-# ---------------------------------------------------------------------------
 # System instructions (extends BASE_PROMPT)
-# ---------------------------------------------------------------------------
 
 MAIN_INSTRUCTIONS = f"""{BASE_PROMPT}
 
@@ -571,9 +545,7 @@ just call it and wait for approval. Never refuse to run a command or say you can
 """
 
 
-# ---------------------------------------------------------------------------
 # Agent creation (ALL features wired here)
-# ---------------------------------------------------------------------------
 
 
 def create_agent() -> Agent[DeepAgentDeps, str]:
@@ -632,8 +604,8 @@ def create_agent() -> Agent[DeepAgentDeps, str]:
         skill_directories=[{"path": str(SKILLS_DIR), "recursive": True}],
         # --- Hooks (Claude Code-style lifecycle hooks) ---
         hooks=HOOKS,
-        # --- Middleware (pydantic-ai-middleware integration) ---
-        middleware=[audit_mw, permission_mw],
+        # --- Capabilities (audit + permission) ---
+        middleware=[audit_cap, permission_cap],
         # --- Processors ---
         eviction_token_limit=20000,  # Save tool outputs > 20K tokens to files
         patch_tool_calls=True,  # Fix orphaned tool calls on resume
@@ -653,10 +625,6 @@ def create_agent() -> Agent[DeepAgentDeps, str]:
         },
     )
 
-
-# ---------------------------------------------------------------------------
-# Session management
-# ---------------------------------------------------------------------------
 
 # Default DEEP.md content to seed into new sessions
 _DEEP_MD_PATH = APP_DIR / "workspace" / "DEEP.md"
@@ -682,7 +650,7 @@ async def get_or_create_session(session_id: str) -> UserSession:
     cp_store = InMemoryCheckpointStore()
 
     # Create deps with the user's sandbox and checkpoint store
-    deps = DeepAgentDeps(backend=sandbox, checkpoint_store=cp_store)
+    deps = DeepAgentDeps(backend=sandbox)
 
     # Create and store session
     session = UserSession(session_id=session_id, deps=deps, checkpoint_store=cp_store)
@@ -719,7 +687,7 @@ async def lifespan(app: FastAPI):
     rt = session_manager._default_runtime  # type: ignore[attr-defined]
     print(f"  Runtime          : {rt or 'python:3.12-slim (default)'}")
     print(f"  Hooks            : {len(HOOKS)} (audit_logger, safety_gate)")
-    print("  Middleware       : AuditMiddleware, PermissionMiddleware")
+    print("  Capabilities     : AuditCapability, PermissionCapability")
     print("  Processors       : eviction(20K), sliding_window(50→30), patch_tool_calls")
     print("  Checkpointing    : every_tool, max=50")
     print("  Context files    : /workspace/DEEP.md")
@@ -736,17 +704,12 @@ async def lifespan(app: FastAPI):
     print(f"Shutdown complete. Stopped {count} sessions.")
 
 
-# ---------------------------------------------------------------------------
-# FastAPI app
-# ---------------------------------------------------------------------------
-
 app = FastAPI(
     title="pydantic-deep Full Example",
     description="Full-featured example demonstrating ALL pydantic-deep capabilities",
     lifespan=lifespan,
 )
 
-# CORS for frontend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -755,13 +718,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Serve static files
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
-
-
-# ---------------------------------------------------------------------------
-# Routes
-# ---------------------------------------------------------------------------
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -1170,11 +1127,6 @@ async def handle_approval(
         await websocket.send_json({"type": "error", "content": str(e)})
 
 
-# ---------------------------------------------------------------------------
-# Streaming helpers
-# ---------------------------------------------------------------------------
-
-
 async def _stream_model_request(
     websocket: WebSocket, node: Any, run: Any, session: UserSession
 ) -> None:
@@ -1312,7 +1264,7 @@ async def _stream_tool_calls(
                 # from session.deps.todos
 
                 # Send middleware audit event (demonstrates real-time middleware stats)
-                stats = audit_mw.get_stats()
+                stats = audit_cap.get_stats()
                 await websocket.send_json(
                     {
                         "type": "middleware_event",
@@ -1340,11 +1292,6 @@ async def process_node(websocket: WebSocket, node: Any, run: Any, session: UserS
 
     elif isinstance(node, End):
         await websocket.send_json({"type": "status", "content": "Completed!"})
-
-
-# ---------------------------------------------------------------------------
-# REST endpoints
-# ---------------------------------------------------------------------------
 
 
 @app.post("/upload")
@@ -1736,12 +1683,12 @@ async def get_config():
                 ],
                 "middleware": [
                     {
-                        "name": "AuditMiddleware",
+                        "name": "AuditCapability",
                         "type": "tool_stats",
                         "description": "Tracks tool usage count, duration, breakdown",
                     },
                     {
-                        "name": "PermissionMiddleware",
+                        "name": "PermissionCapability",
                         "type": "path_blocking",
                         "description": "Blocks access to /etc/passwd, .env, /root/, etc.",
                     },
@@ -1775,8 +1722,8 @@ async def get_config():
                 ],
                 "skills": ["data-analysis", "code-review", "test-generator", "quick-reference"],
                 "interrupt_on": {"execute": True, "write_file": False},
-                "tool_stats": dict(audit_mw.get_stats().tools_used),
-                "total_tool_calls": audit_mw.get_stats().call_count,
+                "tool_stats": dict(audit_cap.get_stats().tools_used),
+                "total_tool_calls": audit_cap.get_stats().call_count,
             }
         }
     )
@@ -1798,7 +1745,7 @@ async def reset(session_id: str = Query(..., description="Session ID")):
     del user_sessions[session_id]
 
     # Reset audit stats
-    audit_mw.reset_stats()
+    audit_cap.reset_stats()
 
     logger.info(f"Reset session: {session_id}")
 

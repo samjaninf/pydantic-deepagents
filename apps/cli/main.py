@@ -84,7 +84,7 @@ def _main_callback(
         pass
 
     if not logfire_enabled:
-        from cli.config import load_config
+        from apps.cli.config import load_config
 
         config = load_config()
         logfire_enabled = config.logfire
@@ -126,7 +126,7 @@ def init(
     ] = None,
 ) -> None:
     """Initialize .pydantic-deep/ project directory with scaffolding."""
-    from cli.init import init_project
+    from apps.cli.init import init_project
 
     root = Path(directory) if directory else Path.cwd()
     init_project(root)
@@ -185,8 +185,8 @@ def run(
     ] = False,
 ) -> None:
     """Run a task non-interactively (benchmark mode)."""
-    from cli.init import ensure_initialized
-    from cli.non_interactive import run_non_interactive
+    from apps.cli.init import ensure_initialized
+    from apps.cli.non_interactive import run_non_interactive
 
     ensure_initialized()
 
@@ -265,8 +265,8 @@ def chat(
     ] = False,
 ) -> None:
     """Start an interactive chat session."""
-    from cli.init import ensure_initialized
-    from cli.interactive import run_interactive
+    from apps.cli.init import ensure_initialized
+    from apps.cli.interactive import run_interactive
 
     ensure_initialized()
 
@@ -298,7 +298,7 @@ app.add_typer(config_app)
 @config_app.command("show")
 def config_show() -> None:
     """Show current configuration."""
-    from cli.config import CliConfig, load_config
+    from apps.cli.config import CliConfig, load_config
 
     config = load_config()
     console = Console()
@@ -325,7 +325,7 @@ def config_set(
     value: Annotated[str, typer.Argument(help="Value to set")],
 ) -> None:
     """Set a configuration value."""
-    from cli.config import get_config_path, set_config_value
+    from apps.cli.config import get_config_path, set_config_value
 
     try:
         set_config_value(get_config_path(), key, value)
@@ -491,10 +491,6 @@ Instructions for this skill go here.
     typer.echo(f"Created skill scaffold at {skill_dir}/")
 
 
-from apps.swebench_agent.cli import swebench_app  # noqa: E402
-
-app.add_typer(swebench_app)
-
 providers_app = typer.Typer(
     name="providers", help="Model provider information.", no_args_is_help=True
 )
@@ -504,7 +500,7 @@ app.add_typer(providers_app)
 @providers_app.command("list")
 def providers_list() -> None:
     """List all supported model providers."""
-    from cli.providers import PROVIDERS, validate_provider_env
+    from apps.cli.providers import PROVIDERS, validate_provider_env
 
     console = Console()
     table = Table(show_header=True, header_style="bold", show_lines=False)
@@ -542,7 +538,7 @@ def providers_check(
     ],
 ) -> None:
     """Check if a model provider is properly configured."""
-    from cli.providers import format_provider_error, parse_model_string
+    from apps.cli.providers import format_provider_error, parse_model_string
 
     error = format_provider_error(model)
     console = Console()
@@ -568,7 +564,7 @@ def threads_list(
     """List saved conversation threads."""
     from pydantic_ai.messages import ModelMessagesTypeAdapter
 
-    from cli.config import get_sessions_dir
+    from apps.cli.config import get_sessions_dir
 
     store_path = Path(directory) if directory else get_sessions_dir()
     if not store_path.exists():
@@ -616,7 +612,7 @@ def threads_delete(
     """Delete a conversation thread."""
     import shutil
 
-    from cli.config import get_sessions_dir
+    from apps.cli.config import get_sessions_dir
 
     store_path = Path(directory) if directory else get_sessions_dir()
     if not store_path.exists():
@@ -654,7 +650,7 @@ def threads_export(
 
     from pydantic_ai.messages import ModelMessagesTypeAdapter
 
-    from cli.config import get_sessions_dir
+    from apps.cli.config import get_sessions_dir
 
     store_path = Path(directory) if directory else get_sessions_dir()
     if not store_path.exists():

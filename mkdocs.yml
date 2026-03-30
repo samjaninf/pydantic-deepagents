@@ -110,9 +110,10 @@ plugins:
           - advanced/context-files.md: Project context file injection
           - advanced/eviction.md: Large output eviction
           - advanced/cost-tracking.md: Token and cost tracking
-          - advanced/middleware.md: Middleware system
+          - advanced/middleware.md: Capabilities system
+          - advanced/agent-spec.md: Agent spec (YAML/JSON)
           - advanced/plan-mode.md: Plan mode subagent
-          - advanced/web-tools.md: Web search, fetch, and HTTP tools
+          - advanced/web-tools.md: Web tools (built-in)
           - advanced/multi-user.md: Multi-user isolation patterns
         CLI:
           - cli/index.md: CLI installation, commands, and features

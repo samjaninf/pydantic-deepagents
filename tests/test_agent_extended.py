@@ -7,7 +7,7 @@ from pydantic_deep import (
     StateBackend,
     create_deep_agent,
 )
-from pydantic_deep.types import Skill, SkillDirectory
+from pydantic_deep.types import Skill
 
 TEST_MODEL = TestModel()
 
@@ -94,12 +94,9 @@ version: 1.0.0
 This is a test skill.
 """)
 
-        directories: list[SkillDirectory] = [
-            {"path": str(tmp_path), "recursive": True},
-        ]
         agent = create_deep_agent(
             model=TEST_MODEL,
-            skill_directories=directories,
+            skill_directories=[str(tmp_path)],
         )
         assert agent is not None
 
