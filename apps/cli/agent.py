@@ -7,10 +7,10 @@ from typing import Any
 
 from pydantic_ai_backends import LocalBackend
 
-from cli.prompts import build_cli_instructions
+from apps.cli.prompts import build_cli_instructions
 from pydantic_deep.agent import create_deep_agent
 from pydantic_deep.deps import DeepAgentDeps
-from pydantic_deep.middleware.hooks import Hook, HookEvent, HookInput, HookResult
+from pydantic_deep.capabilities.hooks import Hook, HookEvent, HookInput, HookResult
 
 
 def _make_shell_allow_list_hook(allow_list: list[str]) -> Hook:
@@ -54,10 +54,12 @@ def create_cli_agent(  # noqa: C901
     shell_allow_list: list[str] | None = None,
     on_cost_update: Any | None = None,
     on_context_update: Any | None = None,
+    on_before_compress: Any | None = None,
+    on_after_compress: Any | None = None,
+    on_eviction: Any | None = None,
     summarization_model: str | None = None,
     extra_middleware: list[Any] | None = None,
     backend: Any | None = None,
-    permission_handler: Any | None = None,
     *,
     include_skills: bool = True,
     include_plan: bool = True,
@@ -104,7 +106,7 @@ def create_cli_agent(  # noqa: C901
     Returns:
         Tuple of (agent, deps) ready for agent.run().
     """
-    from cli.config import load_config
+    from apps.cli.config import load_config
 
     config = load_config(config_path)
 
@@ -114,7 +116,7 @@ def create_cli_agent(  # noqa: C901
     effective_allow_list = shell_allow_list or config.shell_allow_list or None
 
     # Warn (but don't block) if provider env vars are missing
-    from cli.providers import format_provider_error
+    from apps.cli.providers import format_provider_error
 
     provider_error = format_provider_error(effective_model)
     if provider_error:
@@ -134,7 +136,7 @@ def create_cli_agent(  # noqa: C901
     # Build middleware list
     middleware: list[Any] = []
     if not lean:
-        from cli.middleware.loop_detection import LoopDetectionMiddleware
+        from apps.cli.middleware.loop_detection import LoopDetectionMiddleware
 
         middleware.append(LoopDetectionMiddleware())
     if extra_middleware:
@@ -161,7 +163,7 @@ def create_cli_agent(  # noqa: C901
     # Skipped for Docker/sandbox backends where root_dir doesn't exist on host
     local_context = None
     if include_local_context:
-        from cli.local_context import LocalContextToolset
+        from apps.cli.local_context import LocalContextToolset
 
         local_context = LocalContextToolset(root_dir=root)
 
@@ -228,7 +230,7 @@ def create_cli_agent(  # noqa: C901
 
     # Ensure session directory exists (for plans, messages.json)
     if session_id:
-        from cli.config import get_sessions_dir
+        from apps.cli.config import get_sessions_dir
 
         session_dir = get_sessions_dir() / session_id
         session_dir.mkdir(parents=True, exist_ok=True)
@@ -271,8 +273,11 @@ def create_cli_agent(  # noqa: C901
         context_manager=not lean,
         context_manager_max_tokens=None,  # auto-detect from genai-prices
         on_context_update=on_context_update,
+        on_before_compress=on_before_compress,
+        on_after_compress=on_after_compress,
         summarization_model=summarization_model,
         eviction_token_limit=20_000,
+        on_eviction=on_eviction,
         # Cost tracking
         cost_tracking=True,
         on_cost_update=on_cost_update,
@@ -281,17 +286,18 @@ def create_cli_agent(  # noqa: C901
         # Middleware & hooks
         hooks=hooks or None,
         middleware=middleware or None,
-        permission_handler=permission_handler,
         toolsets=[local_context] if local_context else None,
     )
 
     # Extract context middleware for CLI commands (/compact, /context)
     context_mw = getattr(agent, "_context_middleware", None)
+    task_mgr = getattr(agent, "_task_manager", None)
 
     deps = DeepAgentDeps(
         backend=effective_backend,
         context_middleware=context_mw,
     )
+    deps._task_manager = task_mgr  # type: ignore[attr-defined]
     return agent, deps
 
 

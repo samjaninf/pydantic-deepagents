@@ -8,7 +8,7 @@ from typing import Any
 from pydantic_ai import RunContext
 from pydantic_ai.agent import Agent
 from pydantic_ai.toolsets import AbstractToolset, FunctionToolset
-from pydantic_ai_middleware import AgentMiddleware
+from pydantic_ai.capabilities import AbstractCapability
 from subagents_pydantic_ai import (
     DEFAULT_GENERAL_PURPOSE_DESCRIPTION,
     DynamicAgentRegistry,
@@ -375,13 +375,13 @@ Fix errors yourself: install missing modules, fix paths, retry. Don't ask permis
 
 def create_research_agent(
     mcp_servers: list[AbstractToolset],
-    middleware: list[AgentMiddleware[DeepAgentDeps]] | None = None,
+    middleware: list[AbstractCapability[DeepAgentDeps]] | None = None,
 ) -> Agent[DeepAgentDeps, str]:
     """Create the DeepResearch agent with ALL features enabled.
 
     Args:
         mcp_servers: MCP server toolsets (Tavily, Jina, etc.)
-        middleware: Middleware list (AuditMiddleware, PermissionMiddleware)
+        middleware: Capabilities list (AuditCapability, PermissionCapability)
 
     Returns:
         Configured agent.

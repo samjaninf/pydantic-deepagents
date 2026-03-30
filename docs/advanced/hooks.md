@@ -1,6 +1,6 @@
 # Hooks
 
-Hooks allow executing shell commands or Python handlers on tool lifecycle events, following Claude Code's hook conventions. Use them for audit logging, security gates, content filtering, or custom side effects.
+Hooks allow executing shell commands or Python handlers on tool lifecycle events, following Claude Code's hook conventions. Use them for audit logging, security gates, content filtering, or custom side effects. Hooks are implemented via `HooksCapability`, a pydantic-ai capability.
 
 ## Quick Start
 
@@ -32,8 +32,8 @@ agent = create_deep_agent(
 
 Command hooks run shell commands via `SandboxProtocol.execute()`. The hook receives `HookInput` as JSON on stdin and uses **exit codes** for decisions:
 
-- **Exit 0** — Allow (optionally return JSON with modifications)
-- **Exit 2** — Deny (stdout becomes the denial reason)
+- **Exit 0** -- Allow (optionally return JSON with modifications)
+- **Exit 2** -- Deny (stdout becomes the denial reason)
 
 ```python
 Hook(
@@ -52,7 +52,7 @@ Hook(
 Handler hooks call async Python functions directly:
 
 ```python
-from pydantic_deep.middleware.hooks import HookInput, HookResult
+from pydantic_deep.capabilities.hooks import HookInput, HookResult
 
 async def audit_logger(hook_input: HookInput) -> HookResult:
     print(f"[AUDIT] {hook_input.tool_name}({hook_input.tool_input})")
@@ -119,7 +119,7 @@ Hook(event=HookEvent.POST_TOOL_USE, handler=redact_secrets, matcher="read_file")
 
 ## Background Hooks
 
-Background hooks run as fire-and-forget tasks — they don't block tool execution:
+Background hooks run as fire-and-forget tasks -- they don't block tool execution:
 
 ```python
 Hook(
@@ -146,7 +146,7 @@ Hooks receive this data:
 For `PRE_TOOL_USE`, hooks run in order and **first deny wins**:
 
 1. All matching hooks execute sequentially
-2. If any hook returns `allow=False`, the tool call is denied
+2. If any hook returns `allow=False`, the tool call is denied (raises `ModelRetry`)
 3. Argument modifications accumulate across hooks
 
 For `POST_TOOL_USE` and `POST_TOOL_USE_FAILURE`, all matching hooks run:
@@ -154,20 +154,44 @@ For `POST_TOOL_USE` and `POST_TOOL_USE_FAILURE`, all matching hooks run:
 1. Result modifications from each hook are passed to the next
 2. Background hooks run in parallel without blocking
 
+## HooksCapability
+
+`HooksCapability` is the `AbstractCapability` that dispatches hooks. It maps hook events to pydantic-ai capability methods:
+
+| Hook Event | Capability Method |
+|------------|------------------|
+| `PRE_TOOL_USE` | `before_tool_execute()` |
+| `POST_TOOL_USE` | `after_tool_execute()` |
+| `POST_TOOL_USE_FAILURE` | `on_tool_execute_error()` |
+
+When you pass `hooks=[...]` to `create_deep_agent()`, a `HooksCapability` is automatically created and added to the agent's capabilities list. You can also create it directly:
+
+```python
+from pydantic_ai import Agent
+from pydantic_deep.capabilities.hooks import HooksCapability, Hook, HookEvent
+
+hooks_cap = HooksCapability(hooks=[
+    Hook(event=HookEvent.PRE_TOOL_USE, handler=my_handler),
+])
+
+agent = Agent("openai:gpt-4.1", capabilities=[hooks_cap])
+```
+
 ## Components
 
 | Component | Description |
 |-----------|-------------|
-| [`Hook`][pydantic_deep.middleware.hooks.Hook] | Hook definition (event, command/handler, matcher) |
-| [`HookEvent`][pydantic_deep.middleware.hooks.HookEvent] | Enum: `PRE_TOOL_USE`, `POST_TOOL_USE`, `POST_TOOL_USE_FAILURE` |
-| [`HookInput`][pydantic_deep.middleware.hooks.HookInput] | Data passed to hooks |
-| [`HookResult`][pydantic_deep.middleware.hooks.HookResult] | Result from hook execution |
-| [`HooksMiddleware`][pydantic_deep.middleware.hooks.HooksMiddleware] | Middleware that dispatches hooks |
-| `EXIT_ALLOW` | Exit code `0` — allow |
-| `EXIT_DENY` | Exit code `2` — deny |
+| [`Hook`][pydantic_deep.capabilities.hooks.Hook] | Hook definition (event, command/handler, matcher) |
+| [`HookEvent`][pydantic_deep.capabilities.hooks.HookEvent] | Enum: `PRE_TOOL_USE`, `POST_TOOL_USE`, `POST_TOOL_USE_FAILURE` |
+| [`HookInput`][pydantic_deep.capabilities.hooks.HookInput] | Data passed to hooks |
+| [`HookResult`][pydantic_deep.capabilities.hooks.HookResult] | Result from hook execution |
+| [`HooksCapability`][pydantic_deep.capabilities.hooks.HooksCapability] | Capability that dispatches hooks on tool events |
+| `EXIT_ALLOW` | Exit code `0` -- allow |
+| `EXIT_DENY` | Exit code `2` -- deny |
 
 ## Next Steps
 
-- [Checkpointing](checkpointing.md) — Save and rewind conversation state
-- [Memory](memory.md) — Persistent agent memory
-- [Human-in-the-Loop](human-in-the-loop.md) — Approval workflows
+- [Capabilities](middleware.md) -- Capabilities system overview
+- [Checkpointing](checkpointing.md) -- Save and rewind conversation state
+- [Memory](memory.md) -- Persistent agent memory
+- [Human-in-the-Loop](human-in-the-loop.md) -- Approval workflows

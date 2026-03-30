@@ -35,8 +35,8 @@ from rich.live import Live
 from rich.markdown import Markdown
 from rich.text import Text
 
-from cli.agent import create_cli_agent
-from cli.display import (
+from apps.cli.agent import create_cli_agent
+from apps.cli.display import (
     format_cost_line,
     format_tokens,
     install_prettier_code_blocks,
@@ -44,8 +44,8 @@ from cli.display import (
     print_warning,
     print_welcome_banner,
 )
-from cli.theme import Glyphs, Theme, get_glyphs, get_theme
-from cli.tool_display import render_tool_call, render_tool_result
+from apps.cli.theme import Glyphs, Theme, get_glyphs, get_theme
+from apps.cli.tool_display import render_tool_call, render_tool_result
 from pydantic_deep.deps import DeepAgentDeps
 
 console = Console()
@@ -73,13 +73,12 @@ _PASTE_MARKER = "\x16"  # Ctrl+V literal character
 # Module-level image list populated by _read_user_input, consumed by _chat_loop
 _pending_images: list[Any] = []
 
-# Counter for pasted text blocks
 _paste_text_counter = 0
 
 
 def _get_history_config() -> tuple[Path, int]:
     """Return (history_file_path, max_lines) from CLI config."""
-    from cli.config import get_history_path, load_config
+    from apps.cli.config import get_history_path, load_config
 
     config = load_config()
     history_path = Path(config.history_file) if config.history_file else get_history_path()
@@ -111,7 +110,7 @@ _SLASH_COMMANDS = [
 
 def _get_all_slash_commands() -> list[str]:
     """Merge built-in slash commands with discovered custom commands."""
-    from cli.commands import discover_commands
+    from apps.cli.commands import discover_commands
 
     all_cmds = list(_SLASH_COMMANDS)
     for cmd in discover_commands():
@@ -123,7 +122,7 @@ def _get_all_slash_commands() -> list[str]:
 
 def _try_custom_command(user_input: str) -> str | None:
     """Check if user_input matches a custom command. Returns prompt or None."""
-    from cli.commands import invoke_command, load_command
+    from apps.cli.commands import invoke_command, load_command
 
     parts = user_input.strip().split(maxsplit=1)
     cmd_name = parts[0].lstrip("/")
@@ -221,63 +220,6 @@ def _expand_file_mentions(text: str, working_dir: str | None = None) -> str:
     return text
 
 
-_SAFE_TOOLS = frozenset(
-    {
-        "read_file",
-        "read_todos",
-        "ls",
-        "glob",
-        "grep",
-        "web_search",
-        "list_checkpoints",
-        "read_memory",
-    }
-)
-
-
-async def _interactive_permission_handler(
-    tool_name: str,
-    tool_args: dict[str, Any],
-    reason: str,
-) -> bool:
-    """Prompt the user to approve or deny a tool call."""
-    from cli.tool_display import format_tool_call
-
-    if tool_name in _SAFE_TOOLS:
-        return True
-
-    theme = get_theme()
-    formatted = format_tool_call(tool_name, tool_args)
-    console.print(f"\n[bold {theme.warning}]Approval required:[/bold {theme.warning}] {formatted}")
-    if reason:
-        console.print(f"[{theme.muted}]Reason: {reason}[/{theme.muted}]")
-
-    # Rich context for file operations
-    from cli.diff_display import render_edit_approval, render_write_approval
-
-    if tool_name == "edit_file":
-        old_s = tool_args.get("old_string", "")
-        new_s = tool_args.get("new_string", "")
-        if old_s or new_s:
-            console.print(render_edit_approval(tool_args.get("path", ""), old_s, new_s))
-    elif tool_name == "write_file":
-        content = tool_args.get("content", "")
-        if content:
-            console.print(render_write_approval(tool_args.get("path", ""), content))
-
-    try:
-        answer = input("[Y]es / [N]o / [A]uto-approve all: ").strip().lower()
-    except (EOFError, KeyboardInterrupt):
-        return False
-
-    if answer in ("a", "auto"):
-        _SAFE_TOOLS_MUTABLE.add(tool_name)
-        _auto_approve_state["active"] = True
-        return True
-    return answer in ("y", "yes", "")
-
-
-_SAFE_TOOLS_MUTABLE: set[str] = set()
 _auto_approve_state: dict[str, bool] = {"active": False}
 
 
@@ -354,11 +296,6 @@ def _is_tty() -> bool:
     return hasattr(sys.stdout, "isatty") and sys.stdout.isatty()
 
 
-# ---------------------------------------------------------------------------
-# Braille spinner with elapsed time
-# ---------------------------------------------------------------------------
-
-
 class BrailleSpinner:
     """Custom spinner renderable with braille animation and elapsed time."""
 
@@ -381,11 +318,6 @@ class BrailleSpinner:
             f"\u2026[/bold {self._theme.accent}] "
             f"[{self._theme.muted}]({elapsed}s)[/{self._theme.muted}]"
         )
-
-
-# ---------------------------------------------------------------------------
-# Streaming
-# ---------------------------------------------------------------------------
 
 
 async def _stream_text_rich(request_stream: Any, live: Live) -> str:
@@ -508,8 +440,8 @@ def _parse_tool_args(raw_args: Any) -> dict[str, Any]:
 
 async def _stream_tool_calls(node: Any, ctx: Any) -> None:
     """Stream tool-call results from a CallToolsNode."""
-    from cli.diff_display import render_inline_change
-    from cli.tool_display import render_tool_call_error, render_tool_call_success
+    from apps.cli.diff_display import render_inline_change
+    from apps.cli.tool_display import render_tool_call_error, render_tool_call_success
 
     # Track pending calls for elapsed time
     pending: dict[str, tuple[dict[str, Any], float]] = {}
@@ -818,7 +750,7 @@ _COMMAND_DESCRIPTIONS: dict[str, str] = {
 
 def _get_custom_command_descriptions() -> dict[str, str]:
     """Build description map for discovered custom commands."""
-    from cli.commands import discover_commands
+    from apps.cli.commands import discover_commands
 
     return {f"/{cmd.name}": cmd.description for cmd in discover_commands()}
 
@@ -832,7 +764,7 @@ def _command_picker(subset: list[str] | None = None) -> str | None:
     Returns:
         The selected command string, or None if cancelled.
     """
-    from cli.picker import PickerItem, interactive_select
+    from apps.cli.picker import PickerItem, interactive_select
 
     commands = subset if subset else _get_all_slash_commands()
     # Don't show /exit (duplicate of /quit)
@@ -872,7 +804,7 @@ def _file_picker(working_dir: str | None = None) -> str | None:
     Returns:
         Relative file path, or None if cancelled.
     """
-    from cli.picker import PickerItem, interactive_select
+    from apps.cli.picker import PickerItem, interactive_select
 
     root = Path(working_dir) if working_dir else Path.cwd()
 
@@ -943,7 +875,7 @@ def _cmd_model_picker(
     on_change: Any | None,
 ) -> None:
     """Show interactive model picker."""
-    from cli.picker import PickerItem, interactive_select
+    from apps.cli.picker import PickerItem, interactive_select
 
     theme = get_theme()
 
@@ -1049,7 +981,7 @@ def _cmd_help() -> None:
         console.print(f"  [{theme.muted}]{cmd}[/{theme.muted}]  {desc}")
 
     # Custom commands
-    from cli.commands import discover_commands
+    from apps.cli.commands import discover_commands
 
     custom = discover_commands()
     if custom:
@@ -1234,7 +1166,7 @@ def _cmd_tokens(history: list[ModelMessage]) -> None:
 def _cmd_skills() -> None:
     """Handle /skills command."""
     theme = get_theme()
-    from cli.main import _discover_all_skills
+    from apps.cli.main import _discover_all_skills
 
     skills = _discover_all_skills()
     if not skills:
@@ -1521,7 +1453,7 @@ def _raw_line_edit() -> str:  # noqa: C901
 
         # --- Ctrl+V → clipboard image paste ---
         if key == "paste":
-            from cli.clipboard import get_clipboard_image
+            from apps.cli.clipboard import get_clipboard_image
 
             theme = get_theme()
             image = get_clipboard_image()
@@ -1681,7 +1613,7 @@ def _process_paste_markers(text: str) -> str:
     if _PASTE_MARKER not in text:
         return text
 
-    from cli.clipboard import get_clipboard_image
+    from apps.cli.clipboard import get_clipboard_image
 
     theme = get_theme()
     image = get_clipboard_image()
@@ -1864,7 +1796,7 @@ async def _interactive_ask_user(
     Returns:
         The selected option label or custom text.
     """
-    from cli.picker import PickerItem, interactive_select
+    from apps.cli.picker import PickerItem, interactive_select
 
     theme = get_theme()
 
@@ -1961,6 +1893,35 @@ def _show_compression_notice(
     )
 
 
+def _show_compression_start(pct: float, cur: int, mx: int) -> None:
+    """Print notice when context compression begins."""
+    theme = get_theme()
+    glyphs = get_glyphs()
+    sep = glyphs.separator
+    pct_str = f"{pct:.0%}"
+    tok_str = f"{format_tokens(cur)}/{format_tokens(mx)}"
+    console.print(
+        f"\n[{theme.muted}] {sep}{sep}{sep}[/{theme.muted}] "
+        f"[{theme.warning}]{glyphs.pending} Compacting context "
+        f"({pct_str} full, {tok_str}){glyphs.ellipsis}[/{theme.warning}] "
+        f"[{theme.muted}]{sep}{sep}{sep}[/{theme.muted}]"
+    )
+
+
+def _show_eviction_notice(
+    tool_name: str, file_path: str, original_chars: int, preview_chars: int
+) -> None:
+    """Print dim notice when a tool output is evicted to a file."""
+    theme = get_theme()
+    glyphs = get_glyphs()
+    orig_tok = format_tokens(original_chars // 4)
+    prev_tok = format_tokens(preview_chars // 4)
+    console.print(
+        f"  [{theme.muted}]{glyphs.bullet} Output saved & truncated: "
+        f"{orig_tok} \u2192 {prev_tok} tokens[/{theme.muted}]"
+    )
+
+
 def _format_status_bar(
     deps: DeepAgentDeps,
     *,
@@ -1971,6 +1932,7 @@ def _format_status_bar(
     context_max: int = 0,
     message_count: int = 0,
     auto_approve: bool = False,
+    active_tasks: int = 0,
 ) -> str:
     """Build the status bar string shown before each prompt.
 
@@ -2022,6 +1984,12 @@ def _format_status_bar(
             )
         segments.append(ctx_seg)
 
+    # Active tasks
+    if active_tasks > 0:
+        segments.append(
+            f"[{theme.info}]{active_tasks} task{'s' if active_tasks != 1 else ''}[/{theme.info}]"
+        )
+
     # Message count
     if message_count > 0:
         segments.append(f"[{theme.muted}]{message_count} msgs[/{theme.muted}]")
@@ -2060,6 +2028,8 @@ async def _chat_loop(  # noqa: C901
     while True:
         try:
             # Status bar before prompt
+            task_mgr = getattr(deps, "_task_manager", None)
+            n_active = len(task_mgr.list_active_tasks()) if task_mgr else 0
             bar = _format_status_bar(
                 deps,
                 cost=get_cost(),
@@ -2068,6 +2038,7 @@ async def _chat_loop(  # noqa: C901
                 context_current=get_context_current() if get_context_current else 0,
                 context_max=get_context_max() if get_context_max else 0,
                 message_count=len(message_history),
+                active_tasks=n_active,
             )
             if bar:
                 console.print()
@@ -2204,7 +2175,10 @@ async def run_interactive(  # noqa: C901
         context_current = cur
         context_max = mx
 
-    handler = None if auto_approve else _interactive_permission_handler
+    def _on_before_compress(messages: list[Any], cutoff_index: int) -> None:
+        if context_pct > 0 and context_max > 0:
+            _show_compression_start(context_pct, context_current, context_max)
+
     _auto_approve_state["active"] = auto_approve
 
     try:
@@ -2231,8 +2205,9 @@ async def run_interactive(  # noqa: C901
             working_dir=working_dir,
             on_cost_update=_on_cost,
             on_context_update=_on_context,
+            on_before_compress=_on_before_compress,
+            on_eviction=_show_eviction_notice,
             backend=backend,
-            permission_handler=handler,
             model_settings=model_settings,
             session_id=session_id,
         )
@@ -2327,8 +2302,8 @@ async def _get_session_info(session_dir: Path) -> dict[str, Any] | None:
 
 async def _pick_session_interactive() -> list[ModelMessage]:
     """Show interactive session picker with arrow-key navigation."""
-    from cli.config import get_sessions_dir
-    from cli.picker import PickerItem, interactive_select
+    from apps.cli.config import get_sessions_dir
+    from apps.cli.picker import PickerItem, interactive_select
 
     sessions_dir = get_sessions_dir()
     if not sessions_dir.exists():
@@ -2445,7 +2420,7 @@ async def _load_thread(thread_id: str) -> tuple[list[ModelMessage], str | None]:
     if not thread_id:
         return await _pick_session_interactive(), None
 
-    from cli.config import get_sessions_dir
+    from apps.cli.config import get_sessions_dir
 
     sessions_dir = get_sessions_dir()
     if not sessions_dir.exists():

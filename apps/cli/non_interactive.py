@@ -17,15 +17,15 @@ from pydantic_ai import (
 )
 from rich.console import Console
 
-from cli.agent import create_cli_agent
-from cli.display import (
+from apps.cli.agent import create_cli_agent
+from apps.cli.display import (
     format_cost_line,
     print_error,
     print_warning,
     render_markdown,
 )
-from cli.theme import get_glyphs, get_theme
-from cli.tool_display import render_tool_call, render_tool_result
+from apps.cli.theme import get_glyphs, get_theme
+from apps.cli.tool_display import render_tool_call, render_tool_result
 
 _PROVIDER_ENV_VARS: dict[str, str] = {
     "openai": "OPENAI_API_KEY",

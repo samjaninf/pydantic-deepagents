@@ -233,88 +233,93 @@ def _get_sandbox_backend(deps: DeepAgentDeps | None) -> SandboxProtocol | None:
     return None
 
 
-from pydantic_ai_middleware import (  # noqa: E402
-    AgentMiddleware,
-    ToolDecision,
-    ToolPermissionResult,
-)
+from dataclasses import dataclass, field  # noqa: E402
+
+from pydantic_ai import RunContext  # noqa: E402
+from pydantic_ai.capabilities import AbstractCapability  # noqa: E402
+from pydantic_ai.messages import ToolCallPart  # noqa: E402
+from pydantic_ai.tools import ToolDefinition  # noqa: E402
 
 
-class HooksMiddleware(AgentMiddleware["DeepAgentDeps"]):  # type: ignore[misc]
-    """Middleware that executes hooks on tool lifecycle events.
+@dataclass
+class HooksCapability(AbstractCapability[Any]):
+    """Capability that executes hooks on tool lifecycle events.
 
-    This middleware maps tool events to shell commands (via execute()) or
-    Python handlers, following Claude Code's hook conventions:
-    - PRE_TOOL_USE: before tool execution, can allow/deny
+    Maps tool events to shell commands (via execute()) or Python handlers,
+    following Claude Code's hook conventions:
+    - PRE_TOOL_USE: before tool execution, can deny
     - POST_TOOL_USE: after successful tool execution
     - POST_TOOL_USE_FAILURE: after failed tool execution
-
-    Args:
-        hooks: List of Hook definitions to execute.
     """
 
-    def __init__(self, hooks: list[Hook]) -> None:
-        self.hooks = hooks
+    hooks: list[Hook] = field(default_factory=list)
 
-    async def before_tool_call(
+    async def before_tool_execute(
         self,
-        tool_name: str,
-        tool_args: dict[str, Any],
-        deps: DeepAgentDeps | None,
-        ctx: Any = None,
-    ) -> dict[str, Any] | ToolPermissionResult:
-        """Run PRE_TOOL_USE hooks. First deny wins."""
-        matched = _match_hooks(self.hooks, HookEvent.PRE_TOOL_USE, tool_name)
+        ctx: RunContext[Any],
+        *,
+        call: ToolCallPart,
+        tool_def: ToolDefinition,
+        args: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Run PRE_TOOL_USE hooks. First deny raises SkipToolExecution."""
+        matched = _match_hooks(self.hooks, HookEvent.PRE_TOOL_USE, call.tool_name)
         if not matched:
-            return tool_args
+            return args
 
+        deps = ctx.deps
         backend = _get_sandbox_backend(deps)
-        hook_input = _build_hook_input(HookEvent.PRE_TOOL_USE, tool_name, tool_args)
-        current_args = dict(tool_args)
+        hook_input = _build_hook_input(HookEvent.PRE_TOOL_USE, call.tool_name, args)
+        current_args = dict(args)
 
         for hook in matched:
             if hook.background:
-                asyncio.create_task(_run_background_hook(hook, hook_input, backend))
+                asyncio.create_task(
+                    _run_background_hook(hook, hook_input, backend)
+                )
                 continue
 
             result = await _run_hook(hook, hook_input, backend)
 
-            # First deny wins
             if not result.allow:
-                return ToolPermissionResult(
-                    decision=ToolDecision.DENY,
-                    reason=result.reason or "Denied by hook",
-                )
+                from pydantic_ai.exceptions import ModelRetry
 
-            # Apply arg modifications
+                raise ModelRetry(result.reason or "Denied by hook")
+
             if result.modified_args is not None:
                 current_args = result.modified_args
-                hook_input = _build_hook_input(HookEvent.PRE_TOOL_USE, tool_name, current_args)
+                hook_input = _build_hook_input(
+                    HookEvent.PRE_TOOL_USE, call.tool_name, current_args
+                )
 
         return current_args
 
-    async def after_tool_call(
+    async def after_tool_execute(
         self,
-        tool_name: str,
-        tool_args: dict[str, Any],
+        ctx: RunContext[Any],
+        *,
+        call: ToolCallPart,
+        tool_def: ToolDefinition,
+        args: dict[str, Any],
         result: Any,
-        deps: DeepAgentDeps | None,
-        ctx: Any = None,
     ) -> Any:
         """Run POST_TOOL_USE hooks. Can modify result."""
-        matched = _match_hooks(self.hooks, HookEvent.POST_TOOL_USE, tool_name)
+        matched = _match_hooks(self.hooks, HookEvent.POST_TOOL_USE, call.tool_name)
         if not matched:
             return result
 
+        deps = ctx.deps
         backend = _get_sandbox_backend(deps)
         hook_input = _build_hook_input(
-            HookEvent.POST_TOOL_USE, tool_name, tool_args, tool_result=result
+            HookEvent.POST_TOOL_USE, call.tool_name, args, tool_result=result
         )
         current_result = result
 
         for hook in matched:
             if hook.background:
-                asyncio.create_task(_run_background_hook(hook, hook_input, backend))
+                asyncio.create_task(
+                    _run_background_hook(hook, hook_input, backend)
+                )
                 continue
 
             hook_result = await _run_hook(hook, hook_input, backend)
@@ -323,42 +328,48 @@ class HooksMiddleware(AgentMiddleware["DeepAgentDeps"]):  # type: ignore[misc]
                 current_result = hook_result.modified_result
                 hook_input = _build_hook_input(
                     HookEvent.POST_TOOL_USE,
-                    tool_name,
-                    tool_args,
+                    call.tool_name,
+                    args,
                     tool_result=current_result,
                 )
 
         return current_result
 
-    async def on_tool_error(
+    async def on_tool_execute_error(
         self,
-        tool_name: str,
-        tool_args: dict[str, Any],
+        ctx: RunContext[Any],
+        *,
+        call: ToolCallPart,
+        tool_def: ToolDefinition,
+        args: dict[str, Any],
         error: Exception,
-        deps: DeepAgentDeps | None,
-        ctx: Any = None,
-    ) -> Exception | None:
+    ) -> Any:
         """Run POST_TOOL_USE_FAILURE hooks."""
-        matched = _match_hooks(self.hooks, HookEvent.POST_TOOL_USE_FAILURE, tool_name)
+        matched = _match_hooks(
+            self.hooks, HookEvent.POST_TOOL_USE_FAILURE, call.tool_name
+        )
         if not matched:
-            return None
+            raise error
 
+        deps = ctx.deps
         backend = _get_sandbox_backend(deps)
         hook_input = _build_hook_input(
             HookEvent.POST_TOOL_USE_FAILURE,
-            tool_name,
-            tool_args,
+            call.tool_name,
+            args,
             tool_error=error,
         )
 
         for hook in matched:
             if hook.background:
-                asyncio.create_task(_run_background_hook(hook, hook_input, backend))
+                asyncio.create_task(
+                    _run_background_hook(hook, hook_input, backend)
+                )
                 continue
 
             await _run_hook(hook, hook_input, backend)
 
-        return None
+        raise error
 
 
 __all__ = [
@@ -368,5 +379,5 @@ __all__ = [
     "HookEvent",
     "HookInput",
     "HookResult",
-    "HooksMiddleware",
+    "HooksCapability",
 ]

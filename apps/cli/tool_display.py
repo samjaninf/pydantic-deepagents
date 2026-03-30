@@ -11,7 +11,7 @@ from typing import Any
 
 from rich.markup import escape
 
-from cli.theme import Glyphs, get_glyphs, get_theme
+from apps.cli.theme import Glyphs, get_glyphs, get_theme
 
 
 def _abbreviate_path(path: str, max_len: int = 50) -> str:
@@ -219,9 +219,7 @@ def format_tool_result(tool_name: str, result_content: Any) -> str:
     return _truncate(flat, 60)
 
 
-# ---------------------------------------------------------------------------
 # Content preview formatters (used by render_tool_result)
-# ---------------------------------------------------------------------------
 
 _PREVIEW_LINES = 3
 _PREVIEW_CHARS = 300
@@ -305,9 +303,7 @@ def _format_result_preview(tool_name: str, raw: str) -> str:
     return formatter(raw)
 
 
-# ---------------------------------------------------------------------------
 # Rich-rendered output (used by interactive/non-interactive display)
-# ---------------------------------------------------------------------------
 
 
 def render_tool_call(

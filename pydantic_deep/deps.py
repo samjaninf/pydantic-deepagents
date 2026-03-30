@@ -4,15 +4,12 @@ from __future__ import annotations
 
 import mimetypes
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import chardet
 from pydantic_ai_backends import BackendProtocol, StateBackend
 
 from pydantic_deep.types import FileData, Todo, UploadedFile
-
-if TYPE_CHECKING:
-    pass
 
 
 @dataclass
@@ -35,7 +32,7 @@ class DeepAgentDeps:
     subagents: dict[str, Any] = field(default_factory=dict)  # Agent instances
     uploads: dict[str, UploadedFile] = field(default_factory=dict)  # Uploaded files metadata
     ask_user: Any = field(default=None, repr=False)  # Callback for interactive questions
-    context_middleware: Any = field(default=None, repr=False)  # ContextManagerMiddleware | None
+    context_middleware: Any = field(default=None, repr=False)  # ContextManagerCapability | None
     share_todos: bool = False  # When True, subagents share parent's todo list
 
     def __post_init__(self) -> None:

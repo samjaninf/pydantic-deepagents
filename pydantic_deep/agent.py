@@ -24,7 +24,7 @@ from pydantic_deep.deps import DeepAgentDeps
 from pydantic_deep.prompts import BASE_PROMPT
 from pydantic_deep.toolsets.skills import SkillsToolset
 from pydantic_deep.toolsets.skills.backend import BackendSkillsDirectory
-from pydantic_deep.types import SkillDirectory, SubAgentConfig
+from pydantic_deep.types import SubAgentConfig
 
 if TYPE_CHECKING:
     from pydantic_ai.toolsets import AbstractToolset
@@ -74,7 +74,7 @@ def create_deep_agent(
     toolsets: Sequence[AbstractToolset[DeepAgentDeps]] | None = None,
     subagents: list[SubAgentConfig] | None = None,
     skills: list[Skill] | None = None,
-    skill_directories: list[SkillDirectory]
+    skill_directories: list[dict[str, Any]]
     | list[str]
     | list[BackendSkillsDirectory]
     | None = None,
@@ -98,6 +98,9 @@ def create_deep_agent(
     context_manager: bool = True,
     context_manager_max_tokens: int | None = None,
     on_context_update: Any | None = None,
+    on_before_compress: Any | None = None,
+    on_after_compress: Any | None = None,
+    on_eviction: Any | None = None,
     summarization_model: str | None = None,
     context_files: list[str] | None = None,
     context_discovery: bool = False,
@@ -112,15 +115,12 @@ def create_deep_agent(
     checkpoint_store: Any | None = None,
     include_teams: bool = False,
     include_web: bool = False,
-    web_search_provider: Any | None = None,
     include_history_archive: bool = True,
     history_messages_path: str = ".pydantic-deep/messages.json",
     cost_tracking: bool = True,
     cost_budget_usd: float | None = None,
     on_cost_update: Any | None = None,
     middleware: Sequence[Any] | None = None,
-    permission_handler: Any | None = None,
-    middleware_context: Any | None = None,
     plans_dir: str | None = None,
     model_settings: dict[str, Any] | None = None,
     instrument: bool | None = None,
@@ -138,7 +138,7 @@ def create_deep_agent(
     toolsets: Sequence[AbstractToolset[DeepAgentDeps]] | None = None,
     subagents: list[SubAgentConfig] | None = None,
     skills: list[Skill] | None = None,
-    skill_directories: list[SkillDirectory]
+    skill_directories: list[dict[str, Any]]
     | list[str]
     | list[BackendSkillsDirectory]
     | None = None,
@@ -163,6 +163,9 @@ def create_deep_agent(
     context_manager: bool = True,
     context_manager_max_tokens: int | None = None,
     on_context_update: Any | None = None,
+    on_before_compress: Any | None = None,
+    on_after_compress: Any | None = None,
+    on_eviction: Any | None = None,
     summarization_model: str | None = None,
     context_files: list[str] | None = None,
     context_discovery: bool = False,
@@ -177,15 +180,12 @@ def create_deep_agent(
     checkpoint_store: Any | None = None,
     include_teams: bool = False,
     include_web: bool = False,
-    web_search_provider: Any | None = None,
     include_history_archive: bool = True,
     history_messages_path: str = ".pydantic-deep/messages.json",
     cost_tracking: bool = True,
     cost_budget_usd: float | None = None,
     on_cost_update: Any | None = None,
     middleware: Sequence[Any] | None = None,
-    permission_handler: Any | None = None,
-    middleware_context: Any | None = None,
     plans_dir: str | None = None,
     model_settings: dict[str, Any] | None = None,
     instrument: bool | None = None,
@@ -202,7 +202,7 @@ def create_deep_agent(  # noqa: C901
     toolsets: Sequence[AbstractToolset[DeepAgentDeps]] | None = None,
     subagents: list[SubAgentConfig] | None = None,
     skills: list[Skill] | None = None,
-    skill_directories: list[SkillDirectory]
+    skill_directories: list[dict[str, Any]]
     | list[str]
     | list[BackendSkillsDirectory]
     | None = None,
@@ -226,6 +226,9 @@ def create_deep_agent(  # noqa: C901
     context_manager: bool = True,
     context_manager_max_tokens: int | None = None,
     on_context_update: Any | None = None,
+    on_before_compress: Any | None = None,
+    on_after_compress: Any | None = None,
+    on_eviction: Any | None = None,
     summarization_model: str | None = None,
     context_files: list[str] | None = None,
     context_discovery: bool = False,
@@ -240,15 +243,12 @@ def create_deep_agent(  # noqa: C901
     checkpoint_store: Any | None = None,
     include_teams: bool = False,
     include_web: bool = False,
-    web_search_provider: Any | None = None,
     include_history_archive: bool = True,
     history_messages_path: str = ".pydantic-deep/messages.json",
     cost_tracking: bool = True,
     cost_budget_usd: float | None = None,
     on_cost_update: Any | None = None,
     middleware: Sequence[Any] | None = None,
-    permission_handler: Any | None = None,
-    middleware_context: Any | None = None,
     plans_dir: str | None = None,
     model_settings: dict[str, Any] | None = None,
     instrument: bool | None = None,
@@ -281,8 +281,7 @@ def create_deep_agent(  # noqa: C901
         subagents: Subagent configurations for the task tool.
         skills: Pre-loaded skills to make available (new Skill dataclass instances).
         skill_directories: Directories to discover skills from.
-            Accepts legacy SkillDirectory TypedDicts, plain string paths,
-            or BackendSkillsDirectory instances for backend-based skills.
+            Accepts plain string paths or BackendSkillsDirectory instances.
         backend: File storage backend (default: StateBackend).
         include_todo: Whether to include the todo toolset.
         include_filesystem: Whether to include the filesystem toolset.
@@ -359,13 +358,10 @@ def create_deep_agent(  # noqa: C901
             Hooks execute shell commands or Python handlers on tool events
             (PRE_TOOL_USE, POST_TOOL_USE, POST_TOOL_USE_FAILURE). Command
             hooks require a SandboxProtocol backend (LocalBackend or
-            DockerSandbox). Automatically wraps the agent with
-            HooksMiddleware (requires pydantic-ai-middleware package).
+            DockerSandbox). Adds HooksCapability to the agent.
         cost_tracking: Whether to enable automatic cost tracking via
-            CostTrackingMiddleware. When True (default), token usage and
-            USD costs are tracked across runs. Requires wrapping with
-            MiddlewareAgent (triggered automatically). Disable with
-            ``cost_tracking=False`` for plain Agent without middleware.
+            CostTracking capability (from pydantic-ai-shields). When True
+            (default), token usage and USD costs are tracked across runs.
         cost_budget_usd: Maximum allowed cumulative cost in USD.
             When exceeded, the next run raises BudgetExceededError.
             None (default) means unlimited.
@@ -395,13 +391,9 @@ def create_deep_agent(  # noqa: C901
             When True, adds tools for spawning agent teams, assigning
             tasks via shared todo lists, messaging teammates, and
             dissolving teams. Defaults to False.
-        include_web: Whether to include the web toolset (web_search,
-            fetch_url, http_request). Requires ``pip install
-            'pydantic-deep[web-tools]'``. Defaults to False.
-        web_search_provider: Custom search provider implementing
-            :class:`~pydantic_deep.toolsets.web.SearchProvider`. Defaults
-            to :class:`~pydantic_deep.toolsets.web.TavilySearchProvider`
-            (requires ``TAVILY_API_KEY`` env var).
+        include_web: Whether to include web tools. When True, adds
+            pydantic-ai's built-in ``WebSearch()`` and ``WebFetch()``
+            capabilities. Defaults to False.
         include_history_archive: Whether to persist full conversation history
             before context compression discards messages. Adds a
             ``search_conversation_history`` tool so the agent can look up
@@ -410,15 +402,8 @@ def create_deep_agent(  # noqa: C901
         history_messages_path: Path to the messages.json file that stores
             the full conversation history. Defaults to
             ``".pydantic-deep/messages.json"``.
-        middleware: List of AgentMiddleware instances to wrap the agent with.
-            Requires pydantic-ai-middleware package (install with
-            ``pip install pydantic-deep[middleware]``). When provided, the
-            agent is wrapped in a MiddlewareAgent with lifecycle hooks.
-        permission_handler: Async callback for tool permission decisions.
-            Called when middleware returns ToolDecision.ASK. Signature:
-            ``async (tool_name, tool_args, reason) -> bool``.
-        middleware_context: MiddlewareContext instance for sharing state
-            between middleware hooks. Optional.
+        middleware: List of additional AbstractCapability instances to
+            include. These extend the agent with custom lifecycle hooks.
         plans_dir: Directory to save plan files from the planner subagent.
             Defaults to ``/plans`` (relative to backend root).
         model_settings: Provider-specific model settings (temperature, thinking,
@@ -535,6 +520,8 @@ def create_deep_agent(  # noqa: C901
         _set_toolset_retries(console_toolset, retries)
         all_toolsets.append(console_toolset)
 
+    _subagent_task_manager: Any | None = None
+    subagent_toolset: Any | None = None
     if include_subagents:
         # Pass model through to subagents (supports both str and Model objects)
         subagent_model = model or DEFAULT_MODEL
@@ -619,11 +606,12 @@ def create_deep_agent(  # noqa: C901
             registry=subagent_registry,
         )
         all_toolsets.append(subagent_toolset)
+        _subagent_task_manager = getattr(subagent_toolset, "task_manager", None)
 
     # Skills toolset
     skills_toolset = None
     if include_skills:
-        # Convert legacy SkillDirectory dicts to string paths, pass through BackendSkillsDirectory
+        # Normalize skill_directories to list[str | BackendSkillsDirectory]
         directories: list[str | BackendSkillsDirectory] | None = None
         if skill_directories:
             directories = []
@@ -635,7 +623,7 @@ def create_deep_agent(  # noqa: C901
                 else:
                     directories.append(sd)
 
-        # Convert legacy dict-style skills to Skill dataclass instances
+        # Normalize skills to Skill dataclass instances
         from pydantic_deep.toolsets.skills.types import Skill as SkillDataclass
 
         converted_skills: list[SkillDataclass] | None = None
@@ -703,18 +691,48 @@ def create_deep_agent(  # noqa: C901
     if include_teams:
         from pydantic_deep.toolsets.teams import create_team_toolset
 
-        team_toolset = create_team_toolset()
+        # Wire teams to subagent execution engine when both are enabled
+        _team_kwargs: dict[str, Any] = {}
+        if include_subagents and _subagent_task_manager is not None:
+            _team_registry = subagent_registry
+            if _team_registry is None:
+                from subagents_pydantic_ai import DynamicAgentRegistry
+
+                _team_registry = DynamicAgentRegistry()
+            _team_kwargs["registry"] = _team_registry
+            _team_kwargs["task_manager"] = _subagent_task_manager
+
+            # Get the task() tool function from the subagent toolset
+            if subagent_toolset is not None:  # pragma: no branch
+                _task_tool = subagent_toolset.tools.get("task")
+                if _task_tool is not None:
+                    _team_kwargs["task_fn"] = _task_tool.function
+
+            # Factory that creates deep agents for team members
+            _team_model = model
+            _team_image = image_support
+            _team_edit_fmt = edit_format
+
+            def _deep_agent_factory(cfg: dict[str, Any]) -> Any:  # pragma: no cover
+                return create_deep_agent(
+                    model=cfg.get("model", _team_model),
+                    instructions=cfg["instructions"],
+                    include_filesystem=True,
+                    include_todo=True,
+                    include_subagents=False,
+                    include_skills=False,
+                    include_plan=False,
+                    include_teams=False,
+                    context_manager=False,
+                    cost_tracking=False,
+                    image_support=_team_image,
+                    edit_format=_team_edit_fmt,
+                )
+
+            _team_kwargs["agent_factory"] = _deep_agent_factory
+
+        team_toolset = create_team_toolset(**_team_kwargs)
         all_toolsets.append(team_toolset)
-
-    if include_web:  # pragma: no cover
-        from pydantic_deep.toolsets.web import create_web_toolset
-
-        _web_approval = interrupt_on.get("web_search", True) if interrupt_on else True
-        web_toolset = create_web_toolset(
-            search_provider=web_search_provider,
-            require_approval=_web_approval,
-        )
-        all_toolsets.append(web_toolset)
 
     # Build base instructions
     base_instructions = instructions or DEFAULT_INSTRUCTIONS
@@ -758,7 +776,9 @@ def create_deep_agent(  # noqa: C901
     if eviction_token_limit is not None:
         from pydantic_deep.processors.eviction import EvictionProcessor
 
-        eviction = EvictionProcessor(backend=backend, token_limit=eviction_token_limit)
+        eviction = EvictionProcessor(
+            backend=backend, token_limit=eviction_token_limit, on_eviction=on_eviction
+        )
         # Eviction runs FIRST (before summarization reduces context)
         all_processors.insert(0, eviction)
 
@@ -779,10 +799,10 @@ def create_deep_agent(  # noqa: C901
 
         all_toolsets.append(create_history_search_toolset(abs_messages_path))
 
-    # Context manager middleware (token tracking + auto-compression + persistence)
+    # Context manager capability (token tracking + auto-compression)
     context_mw: Any | None = None
     if context_manager:
-        from pydantic_ai_summarization import create_context_manager_middleware
+        from pydantic_ai_summarization import ContextManagerCapability
 
         _cm_kwargs: dict[str, Any] = {
             "on_usage_update": on_context_update,
@@ -791,18 +811,21 @@ def create_deep_agent(  # noqa: C901
             _cm_kwargs["max_tokens"] = context_manager_max_tokens
         if summarization_model is not None:  # pragma: no cover
             _cm_kwargs["summarization_model"] = summarization_model
-        context_mw = create_context_manager_middleware(**_cm_kwargs)
-        all_processors.append(context_mw)
+        if on_before_compress is not None:
+            _cm_kwargs["on_before_compress"] = on_before_compress
+        if on_after_compress is not None:
+            _cm_kwargs["on_after_compress"] = on_after_compress
+        context_mw = ContextManagerCapability(**_cm_kwargs)
 
-    # Cost tracking middleware
-    cost_mw: Any | None = None
+    # Cost tracking capability
+    cost_cap: Any | None = None
     if cost_tracking:
-        from pydantic_ai_middleware import create_cost_tracking_middleware
+        from pydantic_ai_shields import CostTracking
 
         model_name = model if isinstance(model, str) else None
-        cost_mw = create_cost_tracking_middleware(
+        cost_cap = CostTracking(
             model_name=model_name,
-            budget_limit_usd=cost_budget_usd,
+            budget_usd=cost_budget_usd,
             on_cost_update=on_cost_update,
         )
 
@@ -816,6 +839,45 @@ def create_deep_agent(  # noqa: C901
     # Apply instrumentation
     if instrument is not None:  # pragma: no cover
         agent_create_kwargs["instrument"] = instrument
+
+    # Build capabilities list
+    all_capabilities: list[Any] = []
+
+    if hooks is not None:
+        from pydantic_deep.capabilities.hooks import HooksCapability
+
+        all_capabilities.append(HooksCapability(hooks=hooks))
+
+    if include_checkpoints:
+        from pydantic_deep.toolsets.checkpointing import (
+            CheckpointMiddleware as _CheckpointCap,
+        )
+
+        all_capabilities.append(
+            _CheckpointCap(
+                store=_cp_store,
+                frequency=checkpoint_frequency,
+                max_checkpoints=max_checkpoints,
+            )
+        )
+
+    if middleware:
+        all_capabilities.extend(middleware)
+
+    if context_mw is not None:
+        all_capabilities.append(context_mw)
+
+    if cost_cap is not None:
+        all_capabilities.append(cost_cap)
+
+    if include_web:  # pragma: no cover
+        from pydantic_ai.capabilities import WebFetch, WebSearch
+
+        all_capabilities.append(WebSearch())
+        all_capabilities.append(WebFetch())
+
+    if all_capabilities:
+        agent_create_kwargs["capabilities"] = all_capabilities
 
     agent_create_kwargs.update(agent_kwargs)
 
@@ -890,48 +952,9 @@ def create_deep_agent(  # noqa: C901
             else:
                 agent.tool(tool)
 
-    # Convert hooks to HooksMiddleware and merge into middleware list
-    if hooks is not None:
-        from pydantic_deep.middleware.hooks import HooksMiddleware
-
-        hooks_mw = HooksMiddleware(hooks)
-        middleware = list(middleware or []) + [hooks_mw]
-
-    # Checkpoint middleware (toolset already added above before agent creation)
-    if include_checkpoints:
-        from pydantic_deep.toolsets.checkpointing import (
-            CheckpointMiddleware as _CheckpointMW,
-        )
-
-        checkpoint_mw = _CheckpointMW(
-            store=_cp_store,
-            frequency=checkpoint_frequency,
-            max_checkpoints=max_checkpoints,
-        )
-        middleware = list(middleware or []) + [checkpoint_mw]
-
-    # Wrap with middleware if provided
-    if middleware is not None or permission_handler is not None or cost_mw is not None:
-        from pydantic_ai_middleware import MiddlewareAgent
-
-        all_middleware = list(middleware) if middleware else []
-        if context_mw is not None:
-            all_middleware.append(context_mw)
-        if cost_mw is not None:
-            all_middleware.append(cost_mw)
-
-        result = MiddlewareAgent(
-            agent=agent,
-            middleware=all_middleware or None,
-            context=middleware_context,
-            permission_handler=permission_handler,
-        )
-        # Expose context middleware for CLI /compact and /context commands
-        result._context_middleware = context_mw  # type: ignore[attr-defined,unused-ignore]
-        return result  # type: ignore[return-value,no-any-return,unused-ignore]
-
     # Expose context middleware for CLI /compact and /context commands
     agent._context_middleware = context_mw  # type: ignore[attr-defined]
+    agent._task_manager = _subagent_task_manager  # type: ignore[attr-defined]
     return agent
 
 
