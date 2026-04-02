@@ -612,11 +612,11 @@ def _cmd_provider(on_model_change: Any | None = None) -> None:
         on_model_change(selected)
         console.print(
             f"[{theme.success}]Switched to {selected}.[/{theme.success}]\n"
-            f"[{theme.muted}]Note: the agent will use the new model on the next message.[/{theme.muted}]\n"
+            f"[{theme.muted}]Note: new model active on next message.[/{theme.muted}]\n"
         )
 
 
-def _cmd_config(arg: str) -> None:
+def _cmd_config(arg: str) -> None:  # noqa: C901
     """Handle /config command — view or update config.toml settings.
 
     Usage:
@@ -1469,7 +1469,8 @@ def _create_agent_with_retry(
                 effective_model = selected
             elif choice == "2":
                 console.print(
-                    f"[{theme.muted}]Enter model (e.g. anthropic:claude-sonnet-4-6):[/{theme.muted}]"
+                    f"[{theme.muted}]Enter model "
+                    f"(e.g. anthropic:claude-sonnet-4-6):[/{theme.muted}]"
                 )
                 try:
                     manual = input("> ").strip()

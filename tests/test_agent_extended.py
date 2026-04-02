@@ -7,7 +7,8 @@ from pydantic_deep import (
     StateBackend,
     create_deep_agent,
 )
-from pydantic_deep.toolsets.skills import Skill as SkillDataclass, SkillsToolset
+from pydantic_deep.toolsets.skills import Skill as SkillDataclass
+from pydantic_deep.toolsets.skills import SkillsToolset
 
 TEST_MODEL = TestModel()
 

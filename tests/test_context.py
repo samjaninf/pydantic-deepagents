@@ -491,7 +491,7 @@ class TestPerSubagentContext:
 
         create_deep_agent(model=TEST_MODEL, subagents=subagents)
 
-        # Should have existing toolset + ContextToolset (+ AgentMemoryToolset since memory is on by default)
+        # Should have existing toolset + ContextToolset + AgentMemoryToolset
         toolset_types = [type(t).__name__ for t in config["toolsets"]]
         assert "FunctionToolset" in toolset_types
         assert "ContextToolset" in toolset_types
@@ -537,7 +537,7 @@ class TestContextConstants:
 
     def test_subagent_allowlist(self):
         """Test SUBAGENT_CONTEXT_ALLOWLIST."""
-        assert SUBAGENT_CONTEXT_ALLOWLIST == frozenset({"AGENTS.md"})
+        assert frozenset({"AGENTS.md"}) == SUBAGENT_CONTEXT_ALLOWLIST
         assert "SOUL.md" not in SUBAGENT_CONTEXT_ALLOWLIST
 
     def test_default_max_chars(self):

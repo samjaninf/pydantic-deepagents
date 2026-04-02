@@ -10,7 +10,6 @@ from __future__ import annotations
 import argparse
 import asyncio
 import os
-import sys
 from pathlib import Path
 
 
@@ -37,7 +36,6 @@ def main() -> None:
                         os.environ[key] = value
 
     from acp import run_agent
-
     from apps.acp.server import AgentSessionContext, DeepAgentACP
     from pydantic_deep import create_deep_agent
 

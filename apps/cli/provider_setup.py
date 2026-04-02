@@ -173,7 +173,8 @@ def run_provider_setup(console: Console, theme: Any) -> str | None:
     else:
         # Ask for API key
         console.print(
-            f"\n[{theme.muted}]Enter your {provider['name']} API key ({provider['key_hint']}):[/{theme.muted}]"
+            f"\n[{theme.muted}]Enter your {provider['name']} "
+            f"API key ({provider['key_hint']}):[/{theme.muted}]"
         )
         try:
             key = input("> ").strip()

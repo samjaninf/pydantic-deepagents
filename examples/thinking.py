@@ -13,10 +13,10 @@ async def main():
     # Default: thinking="high" — best for complex reasoning tasks
     agent = create_deep_agent()
 
-    # Custom effort levels
-    agent_fast = create_deep_agent(thinking="low")  # Quick tasks
-    agent_deep = create_deep_agent(thinking="xhigh")  # Maximum reasoning
-    agent_no_think = create_deep_agent(thinking=False)  # Disable thinking
+    # Other effort levels (for reference):
+    # create_deep_agent(thinking="low")    # Quick tasks
+    # create_deep_agent(thinking="xhigh")  # Maximum reasoning
+    # create_deep_agent(thinking=False)    # Disable thinking
 
     deps = DeepAgentDeps(backend=StateBackend())
 

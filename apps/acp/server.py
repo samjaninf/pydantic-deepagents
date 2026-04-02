@@ -24,8 +24,22 @@ Usage:
 """
 
 import logging
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import Any
+from uuid import uuid4
+
+from pydantic_ai import Agent
+from pydantic_ai.messages import (
+    ModelMessage,
+    ToolCallPart,
+)
+from pydantic_ai_backends import LocalBackend
+
 from acp import (
     Agent as ACPAgent,
+)
+from acp import (
     InitializeResponse,
     NewSessionResponse,
     PromptResponse,
@@ -48,17 +62,6 @@ from acp.schema import (
     SessionConfigSelectOption,
     TextContentBlock,
 )
-from collections.abc import Callable
-from dataclasses import dataclass
-from pydantic_ai import Agent
-from pydantic_ai.messages import (
-    ModelMessage,
-    ToolCallPart,
-)
-from pydantic_ai_backends import LocalBackend
-from typing import Any
-from uuid import uuid4
-
 from pydantic_deep import DeepAgentDeps
 
 logger = logging.getLogger(__name__)
@@ -248,7 +251,7 @@ class DeepAgentACP(ACPAgent):
         """Cancel current operation."""
         self._cancelled = True
 
-    async def prompt(
+    async def prompt(  # noqa: C901
         self,
         prompt: list[Any],
         session_id: str,
@@ -281,7 +284,7 @@ class DeepAgentACP(ACPAgent):
             )
 
         # Run agent with streaming
-        from pydantic_ai._agent_graph import ModelRequestNode, CallToolsNode
+        from pydantic_ai._agent_graph import CallToolsNode, ModelRequestNode
 
         try:
             active_tool_calls: set[str] = set()
