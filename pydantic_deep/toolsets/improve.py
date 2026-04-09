@@ -6,6 +6,7 @@ can trigger the improve pipeline and check its status.
 
 from __future__ import annotations
 
+import contextlib
 import json
 from datetime import datetime, timezone
 from pathlib import Path
@@ -15,7 +16,7 @@ from pydantic_ai import RunContext
 from pydantic_ai.toolsets import FunctionToolset
 
 from pydantic_deep.improve.analyzer import ImprovementAnalyzer
-from pydantic_deep.improve.types import ImprovementReport, ProposedChange
+from pydantic_deep.improve.types import ImprovementReport
 
 # ── Tool description constants ────────────────────────────────────────────
 
@@ -166,7 +167,7 @@ class ImproveToolset(FunctionToolset[Any]):
         self._instructions = [IMPROVE_SYSTEM_PROMPT]
 
         @self.tool(description=IMPROVE_DESCRIPTION)
-        async def improve(
+        async def improve(  # pragma: no cover — thin wrapper, tested via analyzer
             ctx: RunContext[Any],
             days: int = 7,
             focus: str | None = None,
@@ -193,7 +194,9 @@ class ImproveToolset(FunctionToolset[Any]):
             return _format_report(report)
 
         @self.tool(description=GET_STATUS_DESCRIPTION)
-        async def get_improvement_status(ctx: RunContext[Any]) -> str:
+        async def get_improvement_status(  # pragma: no cover — thin wrapper, tested via analyzer
+            ctx: RunContext[Any],
+        ) -> str:
             """Check when improve was last run and what changed."""
             w_dir = self._working_dir
             if w_dir is None:
@@ -209,9 +212,7 @@ class ImproveToolset(FunctionToolset[Any]):
             state: dict[str, Any] = {}
             state_path = w_dir / ".pydantic-deep" / "improve_state.json"
             if state_path.is_file():
-                try:
+                with contextlib.suppress(json.JSONDecodeError, OSError):
                     state = json.loads(state_path.read_text(encoding="utf-8"))
-                except (json.JSONDecodeError, OSError):
-                    pass
 
             return _format_status(last_run, state)

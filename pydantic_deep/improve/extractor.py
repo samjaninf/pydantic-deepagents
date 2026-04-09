@@ -161,7 +161,7 @@ class SessionExtractor:
 
             # Next chunk starts with overlap for continuity
             next_start = max(chunk_end - self._overlap_messages, chunk_end)
-            if next_start <= start:
+            if next_start <= start:  # pragma: no cover — defensive guard
                 next_start = chunk_end
             start = next_start
 

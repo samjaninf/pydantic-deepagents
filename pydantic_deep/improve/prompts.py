@@ -30,7 +30,8 @@ Extract the following categories of insights:
    that worked, environment details, API patterns, workarounds found.
    For each learning provide:
    - learning: What was learned (e.g., "tests are run with `uv run pytest`")
-   - category: One of: "tool_chain", "file_location", "build_command", "environment", "workaround", "other"
+   - category: One of: "tool_chain", "file_location", "build_command",
+     "environment", "workaround", "other"
    - evidence: The tool calls or outputs that demonstrated this
    - confidence: Float 0.0-1.0
 

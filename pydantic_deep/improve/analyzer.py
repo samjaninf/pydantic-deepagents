@@ -6,6 +6,7 @@ context files, synthesizes proposed changes, and optionally applies them.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import time
 from datetime import datetime, timezone
@@ -93,10 +94,8 @@ class ImprovementAnalyzer:
     def _progress(self, stage: str, current: int = 0, total: int = 0) -> None:
         """Emit progress update."""
         if self._on_progress:
-            try:
+            with contextlib.suppress(Exception):
                 self._on_progress(stage, current, total)
-            except Exception:
-                pass
 
     def _resolve_path(self, target_file: str) -> Path:
         """Resolve a logical context file name to an absolute path.
@@ -251,10 +250,8 @@ class ImprovementAnalyzer:
         for logical_name in self._context_files:
             filepath = self._resolve_path(logical_name)
             if filepath.is_file():
-                try:
+                with contextlib.suppress(OSError):
                     context[logical_name] = filepath.read_text(encoding="utf-8")
-                except OSError:
-                    pass
         return context
 
     async def apply_changes(self, changes: list[ProposedChange]) -> list[str]:
@@ -369,10 +366,8 @@ class ImprovementAnalyzer:
         # Load existing state
         existing: dict[str, Any] = {}
         if state_path.is_file():
-            try:
+            with contextlib.suppress(json.JSONDecodeError, OSError):
                 existing = json.loads(state_path.read_text(encoding="utf-8"))
-            except (json.JSONDecodeError, OSError):
-                pass
 
         total_runs = existing.get("total_runs", 0) + 1
         history: list[dict[str, Any]] = existing.get("history", [])

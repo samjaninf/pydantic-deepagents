@@ -86,7 +86,8 @@ class AgentLearningInsight:
     learning: str
     """What was learned (e.g., 'tests are in tests/ dir', 'uv run pytest works')."""
     category: str
-    """Category: 'tool_chain', 'file_location', 'build_command', 'environment', 'workaround', 'other'."""
+    """Category: 'tool_chain', 'file_location', 'build_command',
+    'environment', 'workaround', 'other'."""
     evidence: str
     """Tool calls or actions that demonstrated this."""
     confidence: float
