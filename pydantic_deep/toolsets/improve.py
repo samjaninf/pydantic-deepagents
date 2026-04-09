@@ -163,7 +163,7 @@ class ImproveToolset(FunctionToolset[Any]):
         self._working_dir = working_dir
         self._model = model
         self._context_files = context_files
-        self._instructions = IMPROVE_SYSTEM_PROMPT
+        self._instructions = [IMPROVE_SYSTEM_PROMPT]
 
         @self.tool(description=IMPROVE_DESCRIPTION)
         async def improve(
