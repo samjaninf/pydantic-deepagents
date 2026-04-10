@@ -33,6 +33,41 @@ pydantic-deep tui --model anthropic:claude-sonnet-4-6
 pydantic-deep tui --working-dir /path/to/project
 ```
 
+### `run` — Headless Execution
+
+```bash
+pydantic-deep run "Fix the failing test in test_auth.py"
+pydantic-deep run --task-file task.md --json
+pydantic-deep run "Refactor utils.py" --max-turns 50 --timeout 300
+pydantic-deep run -f task.md -w /path/to/project -m openai:gpt-5.4
+```
+
+Executes a single task non-interactively and prints the result to stdout. Designed for benchmarks (Terminal Bench), CI/CD pipelines, and scripted automation.
+
+| Option | Description |
+|--------|-------------|
+| `TASK` (argument) | Task description |
+| `--task-file`, `-f` | Read task from file |
+| `--model`, `-m` | Model override |
+| `--working-dir`, `-w` | Working directory (default: cwd) |
+| `--json` | Output result as JSON with usage stats |
+| `--max-turns` | Maximum number of agent turns |
+| `--timeout` | Timeout in seconds |
+
+JSON output includes the agent's response and token usage:
+
+```json
+{
+  "output": "Fixed the test by...",
+  "usage": {
+    "total_tokens": 15420,
+    "request_tokens": 12300,
+    "response_tokens": 3120,
+    "requests": 8
+  }
+}
+```
+
 ### `init` — Initialize Project
 
 ```bash
@@ -191,7 +226,8 @@ Logs include agent lifecycle events, tool calls with timing, command dispatches,
 
 ```
 apps/cli/
-├── main.py              — Typer entry point (tui, init, skills, threads, config)
+├── main.py              — Typer entry point (tui, run, init, skills, threads, config)
+├── run.py               — Headless runner (execute_headless)
 ├── tui.py               — TUI launcher (run_tui, run_preview)
 ├── app.py               — DeepApp (Textual App root)
 ├── commands.py          — Slash command dispatcher

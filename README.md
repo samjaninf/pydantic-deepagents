@@ -92,6 +92,10 @@ pydantic-deep
 # Pick a model
 pydantic-deep tui --model anthropic:claude-sonnet-4-6
 
+# Headless run (benchmarks, CI/CD, scripted automation)
+pydantic-deep run "Fix the failing test in test_auth.py"
+pydantic-deep run --task-file task.md --json --max-turns 50
+
 # Manage config
 pydantic-deep config set model anthropic:claude-sonnet-4-6
 

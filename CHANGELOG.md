@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.5] - 2026-04-10
+
+### Added
+
+- **Headless runner (`pydantic-deep run`)** — new CLI command for non-interactive task execution. Designed for benchmarks (Terminal Bench), CI/CD pipelines, and scripted automation. Supports `--task-file`, `--json` (structured output with usage stats), `--max-turns`, `--timeout`, `--model`, and `--working-dir`. Thin wrapper over `create_cli_agent(non_interactive=True)` — no separate prompt logic
+- **`apps/cli/run.py`** — `execute_headless()` async function with timeout support, JSON output mode, and proper exit codes
+- **Harbor adapter (`apps/harbor/`)** — `BaseInstalledAgent` implementation for Terminal Bench evaluation via Harbor. Installs pydantic-deep in the container via `uv`, runs tasks with `pydantic-deep run --json`, parses JSON output for usage stats. Supports model name conversion (`provider/model` to `provider:model`), API key forwarding, custom git ref via `PYDANTIC_DEEP_GIT_REF` env var
+
 ## [0.3.4] - 2026-04-09
 
 ### Changed

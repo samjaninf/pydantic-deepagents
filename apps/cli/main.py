@@ -3,6 +3,7 @@
 Usage:
     pydantic-deep                           # Launch TUI (default)
     pydantic-deep tui [-m model] [-w dir]   # Launch TUI
+    pydantic-deep run "task description"    # Headless non-interactive run
     pydantic-deep init                      # Initialize project
     pydantic-deep config show               # Show configuration
     pydantic-deep skills list               # List available skills
@@ -121,6 +122,81 @@ def tui(
 
     ensure_initialized()
     run_tui(model=model, working_dir=working_dir or os.getcwd())
+
+
+@app.command()
+def run(
+    task: Annotated[
+        str | None,
+        typer.Argument(help="Task description (or use --task-file)"),
+    ] = None,
+    task_file: Annotated[
+        Path | None,
+        typer.Option("--task-file", "-f", help="Read task from file"),
+    ] = None,
+    working_dir: Annotated[
+        str | None,
+        typer.Option("--working-dir", "-w", help="Working directory"),
+    ] = None,
+    model: Annotated[
+        str | None,
+        typer.Option("--model", "-m", help="Model to use (default: from config)"),
+    ] = None,
+    output_json: Annotated[
+        bool,
+        typer.Option("--json", help="Output result as JSON"),
+    ] = False,
+    max_turns: Annotated[
+        int | None,
+        typer.Option("--max-turns", help="Maximum number of agent turns"),
+    ] = None,
+    timeout: Annotated[
+        int | None,
+        typer.Option("--timeout", help="Timeout in seconds"),
+    ] = None,
+) -> None:
+    """Run a task non-interactively (headless mode).
+
+    Executes a single task and prints the result to stdout.
+    Designed for benchmarks, CI/CD pipelines, and scripted automation.
+
+    Examples:
+        pydantic-deep run "Fix the failing test in test_auth.py"
+        pydantic-deep run --task-file task.md --json
+        pydantic-deep run "Refactor utils.py" --max-turns 50 --timeout 300
+    """
+    from apps.cli.run import execute_headless
+
+    if task is None and task_file is None:
+        typer.echo("Error: provide a task argument or --task-file", err=True)
+        raise typer.Exit(1)
+
+    if task_file is not None:
+        if not task_file.exists():
+            typer.echo(f"Error: task file not found: {task_file}", err=True)
+            raise typer.Exit(1)
+        task_text = task_file.read_text().strip()
+    else:
+        assert task is not None
+        task_text = task
+
+    if not task_text:
+        typer.echo("Error: task is empty", err=True)
+        raise typer.Exit(1)
+
+    import asyncio
+
+    result = asyncio.run(
+        execute_headless(
+            task=task_text,
+            working_dir=working_dir or os.getcwd(),
+            model=model,
+            output_json=output_json,
+            max_turns=max_turns,
+            timeout=timeout,
+        )
+    )
+    raise typer.Exit(result)
 
 
 @app.command()
