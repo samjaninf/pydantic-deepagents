@@ -5,27 +5,6 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.3.6] - 2026-04-11
-
-### Added
-
-- **Browser automation (`BrowserCapability`)** — Playwright-based browser control via `pydantic-deep[browser]`.
-  Gives agents 9 tools: `navigate`, `click`, `type_text`, `get_text`, `screenshot`, `scroll`, `go_back`, `go_forward`,
-  `execute_js`. Single-tab design with automatic popup interception. Domain allowlist, content truncation, and optional
-  auto-screenshot on navigate. Browser lifecycle managed by `wrap_run` — Chromium starts before agent runs, closes
-  after (on success, exception, or cancellation). Requires `playwright>=1.40.0` and `playwright install chromium`.
-  Optional `html2text>=2020.1` for better content extraction
-- **`--browser/--no-browser` CLI flag** — opt-in browser automation for `pydantic-deep tui` and `pydantic-deep run`.
-  Disabled by default (`include_browser = false`). Enable with `--browser` flag or `include_browser = true` in
-  `config.toml`
-- **`--browser-headless/--browser-headed` CLI flag** — control browser window visibility. Default is headed (window
-  visible, `browser_headless = false`). Use `--browser-headless` for CI/scripted use, `--browser-headed` for
-  interactive sessions
-- **`BrowseResult` type** — structured result from browser operations: `url`, `title`, `content`, `screenshot`,
-  `error` fields. Exported from `pydantic_deep.types`
-- **`browser` extras** — `pip install 'pydantic-deep[browser]'` installs `playwright>=1.40.0` and `html2text>=2020.1`.
-  Added to `all` extras
-
 ## [0.3.5] - 2026-04-10
 
 ### Added
@@ -58,6 +37,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Workspace management (`pydantic-deep sandbox`)** — new subcommands: `sandbox list` shows Docker workspaces for the
   current project with status/image/creation date; `sandbox stop <name>` stops a specific workspace;
   `sandbox stop all --rm` stops and removes all project workspaces
+- **Browser automation (`BrowserCapability`)** — Playwright-based browser control via `pydantic-deep[browser]`.
+  Gives agents 9 tools: `navigate`, `click`, `type_text`, `get_text`, `screenshot`, `scroll`, `go_back`, `go_forward`,
+  `execute_js`. Single-tab design with automatic popup interception. Domain allowlist, content truncation, and optional
+  auto-screenshot on navigate. Browser lifecycle managed by `wrap_run` — Chromium starts before agent runs, closes
+  after (on success, exception, or cancellation). Requires `playwright>=1.40.0` and `playwright install chromium`.
+  Optional `html2text>=2020.1` for better content extraction
+- **`--browser/--no-browser` CLI flag** — opt-in browser automation for `pydantic-deep tui` and `pydantic-deep run`.
+  Disabled by default (`include_browser = false`). Enable with `--browser` flag or `include_browser = true` in
+  `config.toml`
+- **`--browser-headless/--browser-headed` CLI flag** — control browser window visibility. Default is headed (window
+  visible, `browser_headless = false`). Use `--browser-headless` for CI/scripted use, `--browser-headed` for
+  interactive sessions
+- **`BrowseResult` type** — structured result from browser operations: `url`, `title`, `content`, `screenshot`,
+  `error` fields. Exported from `pydantic_deep.types`
+- **`browser` extras** — `pip install 'pydantic-deep[browser]'` installs `playwright>=1.40.0` and `html2text>=2020.1`.
+  Added to `all` extras
 
 ### Changed
 
