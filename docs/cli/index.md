@@ -33,6 +33,59 @@ pydantic-deep tui --model anthropic:claude-sonnet-4-6
 pydantic-deep tui --working-dir /path/to/project
 ```
 
+### `run` — Headless Execution
+
+```bash
+pydantic-deep run "Fix the failing test in test_auth.py"
+pydantic-deep run --task-file task.md --json
+pydantic-deep run "Refactor utils.py" --max-turns 50 --timeout 300
+pydantic-deep run -f task.md -w /path/to/project -m openai:gpt-5.4
+pydantic-deep run "Fix bug" --no-web-search --no-web-fetch --thinking false
+pydantic-deep run "Analyze data" --sandbox docker
+```
+
+Executes a single task non-interactively and prints the result to stdout. Designed for benchmarks (Terminal Bench), CI/CD pipelines, and scripted automation.
+
+All feature flags default from `.pydantic-deep/config.toml` — the same defaults as the TUI. Use flags to override specific features.
+
+| Option | Description |
+|--------|-------------|
+| `TASK` (argument) | Task description |
+| `--task-file`, `-f` | Read task from file |
+| `--model`, `-m` | Model override (from config) |
+| `--working-dir`, `-w` | Working directory (default: cwd) |
+| `--json` | Output result as JSON with usage stats |
+| `--max-turns` | Maximum number of agent turns |
+| `--timeout` | Timeout in seconds |
+| `--temperature` | Sampling temperature (default: 0.0 in headless) |
+| `--web-search` / `--no-web-search` | Web search (from config) |
+| `--web-fetch` / `--no-web-fetch` | Web fetch (from config) |
+| `--thinking` | Thinking effort: minimal/low/medium/high/xhigh/false (from config) |
+| `--todo` / `--no-todo` | Task planning (from config) |
+| `--subagents` / `--no-subagents` | Subagent delegation (from config) |
+| `--skills` / `--no-skills` | Skills system (from config) |
+| `--plan` / `--no-plan` | Plan mode (from config) |
+| `--memory` / `--no-memory` | Persistent memory (from config) |
+| `--teams` / `--no-teams` | Agent teams (from config) |
+| `--context` / `--no-context` | Auto-discover AGENTS.md/SOUL.md (from config) |
+| `--sandbox`, `-s` | Sandbox backend: `local` or `docker` (from config) |
+| `--browser` / `--no-browser` | Enable Playwright browser automation (from config, requires `pydantic-deep[browser]`) |
+| `--browser-headless` / `--browser-headed` | Run browser hidden or with visible window (default: headed) |
+
+JSON output includes the agent's response and token usage:
+
+```json
+{
+  "output": "Fixed the test by...",
+  "usage": {
+    "total_tokens": 15420,
+    "request_tokens": 12300,
+    "response_tokens": 3120,
+    "requests": 8
+  }
+}
+```
+
 ### `init` — Initialize Project
 
 ```bash
@@ -156,6 +209,70 @@ Four built-in color themes:
 
 Switch with `/theme ocean` or save to config.
 
+## Docker Sandbox
+
+Run the agent inside a Docker container for isolated code execution.
+The TUI stays in your terminal but all file operations and shell commands
+execute inside the container. Your working directory is mounted at
+`/workspace` so project files are shared.
+
+```bash
+# TUI with Docker sandbox (ephemeral — clean container every time)
+pydantic-deep tui --sandbox docker
+
+# Headless with Docker sandbox
+pydantic-deep run "Install pandas and analyze data.csv" --sandbox docker
+```
+
+Requires Docker to be running and `pydantic-ai-backend[docker]` installed:
+
+```bash
+pip install pydantic-ai-backend[docker]
+```
+
+### Named Containers (Reusable)
+
+By default, each session gets a fresh container. Use `--container <name>`
+to create a named container that persists between sessions — installed
+packages, caches, and other filesystem state survive restarts:
+
+```bash
+# Create/reuse a named container
+pydantic-deep tui --container ml-env
+pydantic-deep run "Train the model" --container ml-env
+
+# Different container for different workloads
+pydantic-deep tui --container web-dev
+```
+
+`--container` implies `--sandbox docker` automatically.
+
+### Container Management
+
+```bash
+# List containers for this project
+pydantic-deep sandbox list
+
+# Stop a named container
+pydantic-deep sandbox stop ml-env
+
+# Stop and remove all containers for this project
+pydantic-deep sandbox stop all --rm
+```
+
+### Config
+
+Set as default in config:
+
+```toml
+sandbox = "docker"
+sandbox_image = "python:3.12-slim"
+```
+
+The working directory is mounted read-write, so file changes always
+persist on the host. Shell commands, package installs, and other side
+effects stay inside the container.
+
 ## Configuration
 
 Config file: `.pydantic-deep/config.toml`
@@ -169,6 +286,10 @@ include_subagents = true
 web_search = true
 web_fetch = true
 approve_tools = ["execute"]
+sandbox = "local"
+sandbox_image = "python:3.12-slim"
+include_browser = false       # opt-in: requires pydantic-deep[browser]
+browser_headless = false      # show browser window (default)
 ```
 
 API keys: `.pydantic-deep/keys.toml` (managed via `/provider` command)
@@ -185,13 +306,14 @@ Per-session debug logs are saved to `.pydantic-deep/logs/`:
 └── latest.log             # Symlink to current session
 ```
 
-Logs include agent lifecycle events, tool calls with timing, command dispatches, and errors with tracebacks. Last 20 session logs are kept automatically.
+Logs include agent lifecycle events, tool calls with timing, command dispatches, notifications, subagent outputs, and errors with tracebacks. Last 20 session logs are kept automatically. All `app.notify()` calls (errors, warnings, info) are automatically logged.
 
 ## Architecture
 
 ```
 apps/cli/
-├── main.py              — Typer entry point (tui, init, skills, threads, config)
+├── main.py              — Typer entry point (tui, run, init, skills, threads, config)
+├── run.py               — Headless runner (execute_headless)
 ├── tui.py               — TUI launcher (run_tui, run_preview)
 ├── app.py               — DeepApp (Textual App root)
 ├── commands.py          — Slash command dispatcher

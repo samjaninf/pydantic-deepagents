@@ -89,6 +89,7 @@ from pydantic_ai_summarization import (
 
 from pydantic_deep.agent import create_deep_agent, create_default_deps, run_with_files
 from pydantic_deep.capabilities import (
+    BrowserCapability,
     ContextFilesCapability,
     MemoryCapability,
     PlanCapability,
@@ -104,6 +105,7 @@ from pydantic_deep.capabilities.hooks import (
     HookResult,
     HooksCapability,
 )
+from pydantic_deep.deps import DEFAULT_USAGE_LIMITS as DEFAULT_USAGE_LIMITS
 from pydantic_deep.deps import DeepAgentDeps
 from pydantic_deep.processors.eviction import (
     DEFAULT_EVICTION_PATH,
@@ -126,6 +128,7 @@ from pydantic_deep.styles import (
     resolve_style,
 )
 from pydantic_deep.toolsets import SkillsToolset, SubAgentToolset, TodoToolset, create_plan_toolset
+from pydantic_deep.toolsets.browser import BrowserToolset
 from pydantic_deep.toolsets.checkpointing import (
     Checkpoint,
     CheckpointMiddleware,
@@ -188,6 +191,7 @@ from pydantic_deep.toolsets.teams import (
     create_team_toolset,
 )
 from pydantic_deep.types import (
+    BrowseResult,
     CompiledSubAgent,
     ResponseFormat,
     SubAgentConfig,
@@ -226,6 +230,7 @@ __all__ = [
     # Session Management
     "SessionManager",
     # Capabilities (pydantic-ai AbstractCapability)
+    "BrowserCapability",
     "SkillsCapability",
     "ContextFilesCapability",
     "MemoryCapability",
@@ -238,6 +243,7 @@ __all__ = [
     "LimitWarnerCapability",
     "CostTracking",
     # Toolsets
+    "BrowserToolset",
     "TodoToolset",
     "create_console_toolset",
     "get_console_system_prompt",
@@ -341,6 +347,7 @@ __all__ = [
     "ToolBlocked",
     "OutputBlocked",
     # Types
+    "BrowseResult",
     "FileData",
     "FileInfo",
     "WriteResult",

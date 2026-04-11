@@ -81,6 +81,7 @@ That's it. A Textual-based TUI launches with:
 - Persistent memory across sessions
 - Context compression for unlimited conversations
 - Git-aware project context
+- Browser automation via Playwright (`--browser`)
 - `/improve` -- learn from past sessions and update context files
 - `/skills`, `/diff`, `/model`, `/provider`, `/compact`, and more
 - Customizable themes, skills, and hooks
@@ -91,6 +92,23 @@ pydantic-deep
 
 # Pick a model
 pydantic-deep tui --model anthropic:claude-sonnet-4-6
+
+# Docker sandbox — isolated execution, project dir mounted at /workspace
+pydantic-deep tui --sandbox docker
+pydantic-deep run "Install pandas and analyze data" --sandbox docker
+
+# Named container — packages persist between sessions
+pydantic-deep tui --container ml-env
+pydantic-deep sandbox list
+
+# Headless run (benchmarks, CI/CD, scripted automation)
+pydantic-deep run "Fix the failing test in test_auth.py"
+pydantic-deep run --task-file task.md --json
+pydantic-deep run "Fix bug" --no-web-search --no-web-fetch --thinking false
+
+# Browser automation (requires pydantic-deep[browser])
+pydantic-deep run "Go to example.com and summarize the content" --browser
+pydantic-deep tui --browser
 
 # Manage config
 pydantic-deep config set model anthropic:claude-sonnet-4-6
@@ -124,6 +142,9 @@ result = await agent.run("Create a todo list for building a REST API", deps=deps
 One function call gives you an agent with planning, filesystem tools, subagents, skills, context management, and cost tracking. Everything is toggleable:
 
 ```python
+from pydantic_deep import create_deep_agent
+from pydantic_deep.capabilities.browser import BrowserCapability
+
 agent = create_deep_agent(
     model="anthropic:claude-sonnet-4-6",
     include_todo=True,          # Task planning
@@ -135,6 +156,7 @@ agent = create_deep_agent(
     include_teams=True,         # Multi-agent teams with shared TODOs
     web_search=True,            # WebSearch capability
     web_fetch=True,             # WebFetch capability
+    capabilities=[BrowserCapability()],  # Playwright browser automation
     thinking="high",            # Thinking/reasoning effort
     context_manager=True,       # Auto-summarization for unlimited context
     cost_tracking=True,         # Token/USD budget enforcement

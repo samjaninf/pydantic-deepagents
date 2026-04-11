@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 from typing import Any
 
 from textual.app import ComposeResult
@@ -33,6 +34,7 @@ from apps.cli.widgets.message_list import MessageList
 from apps.cli.widgets.notification import notify_success, notify_warning
 from apps.cli.widgets.side_panel import SidePanel
 from apps.cli.widgets.status_bar import StatusBar
+from pydantic_deep.deps import DEFAULT_USAGE_LIMITS
 
 
 class ChatScreen(Screen):
@@ -61,8 +63,38 @@ class ChatScreen(Screen):
         """Show welcome banner, init session, bootstrap context files, focus input."""
         self._init_session()
         self._bootstrap_context_files()
+        self._init_side_panel()
         self.call_later(self._show_welcome)
         self.query_one(InputArea).focus_input()
+
+    def on_resize(self, event: Any) -> None:
+        """Keep side panel responsive to terminal width changes."""
+        self.query_one(SidePanel).update_for_width(self.app.size.width)
+
+    def _init_side_panel(self) -> None:
+        """Show side panel and populate with default subagents."""
+        side = self.query_one(SidePanel)
+        side.update_for_width(self.app.size.width)
+
+        from apps.cli.widgets.subagents_panel import SubagentsWidget
+
+        sa_widget = side.query_one(SubagentsWidget)
+        defaults = []
+        # Show built-in subagents as available
+        agent = getattr(self.app, "agent", None)
+        if agent:
+            # Extract subagent names from the task manager
+            mgr = getattr(agent, "_task_manager", None)
+            if mgr:
+                for name in sorted(getattr(mgr, "_agents", {}).keys()):
+                    defaults.append({"name": name, "status": "idle", "description": ""})
+        if not defaults:
+            # Fallback — show common built-ins
+            defaults = [
+                {"name": "planner", "status": "idle", "description": ""},
+                {"name": "research", "status": "idle", "description": ""},
+            ]
+        sa_widget.agents = defaults
 
     def _bootstrap_context_files(self) -> None:
         """Create AGENTS.md, SOUL.md and MEMORY.md if they don't exist."""
@@ -207,11 +239,14 @@ class ChatScreen(Screen):
             import json
             from datetime import datetime, timezone
 
+            # Subagent outputs get full content; other tools get preview
+            is_subagent = tool_name == "task"
+            max_result = 20_000 if is_subagent else 2000
             record = {
                 "ts": datetime.now(timezone.utc).isoformat(),
                 "tool": tool_name,
                 "args": {k: str(v)[:500] for k, v in args.items()},
-                "result_preview": result[:2000],
+                "result_preview": result[:max_result],
                 "result_length": len(result),
                 "elapsed": round(elapsed, 3),
                 "error": is_error,
@@ -241,6 +276,10 @@ class ChatScreen(Screen):
                 if hasattr(usage, "output_tokens"):
                     total_output += usage.output_tokens or 0
 
+            # Update token breakdown
+            status.total_input_tokens = total_input
+            status.total_output_tokens = total_output
+
             # Estimate cost (~$3/MTok input, ~$15/MTok output for Sonnet-class)
             estimated_cost = (total_input * 3.0 + total_output * 15.0) / 1_000_000
             status.total_cost = estimated_cost
@@ -258,7 +297,9 @@ class ChatScreen(Screen):
                 status.context_max = max_tokens
                 status.context_pct = total_input / max_tokens
         except Exception:
-            pass
+            from apps.cli.debug_log import get_logger
+
+            get_logger().error("_sync_status_from_history failed", exc_info=True)
 
     def add_system_message(self, text: str) -> None:
         """Add a synthetic assistant message to history and save.
@@ -438,15 +479,7 @@ class ChatScreen(Screen):
         log.info("Agent run started", prompt_length=len(text), history_messages=len(history))
 
         pending: dict[str, tuple[dict[str, Any], float]] = {}
-        _TODO_TOOLS = frozenset(
-            {
-                "read_todos",
-                "write_todos",
-                "add_todo",
-                "update_todo_status",
-                "remove_todo",
-            }
-        )
+        _TODO_TOOLS: frozenset[str] = frozenset()  # Show all tool calls in UI
         _TEAM_TOOLS = frozenset(
             {
                 "spawn_team",
@@ -472,7 +505,9 @@ class ChatScreen(Screen):
             return {}
 
         try:
-            async with agent.iter(text, deps=deps, message_history=history) as run:
+            async with agent.iter(
+                text, deps=deps, message_history=history, usage_limits=DEFAULT_USAGE_LIMITS
+            ) as run:
                 async for node in run:
                     if isinstance(node, UserPromptNode):
                         continue
@@ -484,22 +519,24 @@ class ChatScreen(Screen):
                             async for event in stream:
                                 if isinstance(event, PartDeltaEvent):
                                     if isinstance(event.delta, TextPartDelta):
-                                        # Switch off thinking indicator once text starts
                                         if header.is_thinking:
                                             header.is_thinking = False
+                                            assistant.finalize_thinking()
                                         delta = event.delta.content_delta
                                         if delta:
                                             assistant.append_text(delta)
                                             app.last_response += delta  # type: ignore
                                             msg_list.scroll_end(animate=False)
                                     elif isinstance(event.delta, ThinkingPartDelta):
-                                        # Feature 10: Show thinking indicator
                                         if not header.is_thinking:
                                             header.is_thinking = True
+                                        if event.delta.content_delta:
+                                            assistant.append_thinking(event.delta.content_delta)
                                 elif isinstance(event, FinalResultEvent):
                                     final_found = True
                                     if header.is_thinking:
                                         header.is_thinking = False
+                                        assistant.finalize_thinking()
                                     break
 
                             # Phase 2: stream remaining text after FinalResultEvent
@@ -560,14 +597,17 @@ class ChatScreen(Screen):
                                         or "exit code 1" in raw.lower()
                                         or "traceback" in raw.lower()[:200]
                                     )
-                                    log.debug(
-                                        "Tool call completed",
-                                        tool=tool_name,
-                                        call_id=call_id,
-                                        elapsed=f"{elapsed:.2f}s",
-                                        is_error=is_error,
-                                        output_length=len(raw),
-                                    )
+                                    log_kwargs: dict[str, Any] = {
+                                        "tool": tool_name,
+                                        "call_id": call_id,
+                                        "elapsed": f"{elapsed:.2f}s",
+                                        "is_error": is_error,
+                                        "output_length": len(raw),
+                                    }
+                                    if tool_name == "task":
+                                        # Log full subagent output for debugging
+                                        log_kwargs["output"] = raw[:5000]
+                                    log.debug("Tool call completed", **log_kwargs)
                                     # Save structured tool trace for /improve
                                     self._append_tool_log(tool_name, args, raw, elapsed, is_error)
                                     if tool_name not in _TODO_TOOLS:
@@ -590,6 +630,17 @@ class ChatScreen(Screen):
             assistant.finalize_text()
 
             if result is not None:
+                # Show per-turn usage on the assistant message
+                try:
+                    usage = result.usage()
+                    assistant.set_usage(
+                        input_tokens=usage.request_tokens or 0,
+                        output_tokens=usage.response_tokens or 0,
+                        requests=usage.requests or 0,
+                    )
+                except Exception:
+                    pass
+
                 app.message_history = result.all_messages()  # type: ignore
                 log.info(
                     "Agent run completed",
@@ -646,6 +697,7 @@ class ChatScreen(Screen):
                         deps=deps,
                         message_history=result.all_messages(),
                         deferred_tool_results=DeferredToolResults(approvals=approvals),
+                        usage_limits=DEFAULT_USAGE_LIMITS,
                     ) as cont_run:
                         async for node in cont_run:
                             if isinstance(node, UserPromptNode):
@@ -721,13 +773,13 @@ class ChatScreen(Screen):
             log.info("Agent run cancelled")
         except Exception as exc:
             log.error("Agent run failed", exc_info=True)
-            import contextlib
-
             assistant.append_text(f"\n\n**Error:** {exc}")
             assistant.finalize_text()
             with contextlib.suppress(Exception):
                 app.notify(f"Agent error: {exc}", severity="error", timeout=10)  # type: ignore
         finally:
+            # Always save session — even after errors or cancellation
+            self._save_session()
             header.is_streaming = False
             header.is_thinking = False
             msg_list.end_assistant_message()
@@ -830,8 +882,16 @@ class ChatScreen(Screen):
 
     def on_cost_updated(self, event: CostUpdated) -> None:
         status = self.query_one(StatusBar)
+        header = self.query_one(DeepHeader)
         status.current_cost = event.run_cost
         status.total_cost = event.total_cost
+        header.total_cost = event.total_cost
+        if event.total_input_tokens > 0:
+            status.total_input_tokens = event.total_input_tokens
+            header.total_input_tokens = event.total_input_tokens
+        if event.total_output_tokens > 0:
+            status.total_output_tokens = event.total_output_tokens
+            header.total_output_tokens = event.total_output_tokens
 
     def on_context_updated(self, event: ContextUpdated) -> None:
         status = self.query_one(StatusBar)
@@ -946,9 +1006,4 @@ class ChatScreen(Screen):
 
         self.app.push_screen(SearchModal(), _handle_result)
 
-    def on_resize(self) -> None:
-        """Show/hide side panel based on terminal width."""
-        side = self.query_one(SidePanel)
-        status = self.query_one(StatusBar)
-        has_content = status.total_todos > 0
-        side.show_if_needed(self.app.size.width, has_content)
+    # on_resize is defined near on_mount — handles side panel visibility

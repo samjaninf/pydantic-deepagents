@@ -16,6 +16,8 @@ from typing import Any
 def run_tui(
     model: str | None = None,
     working_dir: str | Path | None = None,
+    sandbox: str | None = None,
+    workspace: str | None = None,
     **kwargs: Any,
 ) -> None:
     """Launch the Textual TUI.
@@ -60,13 +62,21 @@ def run_tui(
         if _app is None:
             return
         try:
-            # Use real cost if available, otherwise status bar calculates from history
-            run_cost = getattr(cost_info, "run_cost_usd", None)
-            total_cost = getattr(cost_info, "total_cost_usd", None)
-            if run_cost is not None:
-                _app.current_cost = float(run_cost)
-            if total_cost is not None:
-                _app.total_cost = float(total_cost)
+            from apps.cli.messages import CostUpdated
+
+            run_cost = float(getattr(cost_info, "run_cost_usd", 0) or 0)
+            total_cost = float(getattr(cost_info, "total_cost_usd", 0) or 0)
+            # CostInfo has total_request_tokens / total_response_tokens
+            total_input = int(getattr(cost_info, "total_request_tokens", 0) or 0)
+            total_output = int(getattr(cost_info, "total_response_tokens", 0) or 0)
+
+            _app.current_cost = run_cost
+            _app.total_cost = total_cost
+            # Post to current screen (not app) — Textual messages bubble up, not down
+            if _app.screen is not None:
+                _app.screen.post_message(
+                    CostUpdated(run_cost, total_cost, total_input, total_output)
+                )
         except Exception:
             pass
 
@@ -95,6 +105,8 @@ def run_tui(
             working_dir=str(working_dir) if working_dir else None,
             on_cost_update=_on_cost_update,
             on_context_update=_on_context_update,
+            sandbox=sandbox,
+            workspace=workspace,
             **kwargs,
         )
     except Exception as exc:
@@ -113,7 +125,12 @@ def run_tui(
         startup_error=startup_error,
     )
     app_ref[0] = app
-    app.run()
+    try:
+        app.run()
+    finally:
+        # Stop Docker container if sandbox backend was used
+        if deps is not None and hasattr(deps.backend, "stop"):
+            deps.backend.stop()
 
 
 def run_preview() -> None:

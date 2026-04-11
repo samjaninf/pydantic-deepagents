@@ -3,6 +3,7 @@
 Usage:
     pydantic-deep                           # Launch TUI (default)
     pydantic-deep tui [-m model] [-w dir]   # Launch TUI
+    pydantic-deep run "task description"    # Headless non-interactive run
     pydantic-deep init                      # Initialize project
     pydantic-deep config show               # Show configuration
     pydantic-deep skills list               # List available skills
@@ -114,13 +115,220 @@ def tui(
         str | None,
         typer.Option("--working-dir", "-w", help="Working directory"),
     ] = None,
+    sandbox: Annotated[
+        str | None,
+        typer.Option("--sandbox", "-s", help="Sandbox backend: local or docker (from config)"),
+    ] = None,
+    workspace: Annotated[
+        str | None,
+        typer.Option(
+            "--workspace",
+            help=(
+                "Named Docker workspace shared across threads. "
+                "Packages and state persist between sessions. "
+                "Implies --sandbox docker."
+            ),
+        ),
+    ] = None,
 ) -> None:
     """Launch the Textual-based TUI (rich interactive interface)."""
     from apps.cli.init import ensure_initialized
     from apps.cli.tui import run_tui
 
+    # --workspace implies --sandbox docker
+    if workspace and not sandbox:
+        sandbox = "docker"
+
     ensure_initialized()
-    run_tui(model=model, working_dir=working_dir or os.getcwd())
+    run_tui(
+        model=model,
+        working_dir=working_dir or os.getcwd(),
+        sandbox=sandbox,
+        workspace=workspace,
+    )
+
+
+@app.command()
+def run(
+    task: Annotated[
+        str | None,
+        typer.Argument(help="Task description (or use --task-file)"),
+    ] = None,
+    task_file: Annotated[
+        Path | None,
+        typer.Option("--task-file", "-f", help="Read task from file"),
+    ] = None,
+    working_dir: Annotated[
+        str | None,
+        typer.Option("--working-dir", "-w", help="Working directory"),
+    ] = None,
+    model: Annotated[
+        str | None,
+        typer.Option("--model", "-m", help="Model to use (default: from config)"),
+    ] = None,
+    output_json: Annotated[
+        bool,
+        typer.Option("--json", help="Output result as JSON"),
+    ] = False,
+    max_turns: Annotated[
+        int | None,
+        typer.Option("--max-turns", help="Maximum number of agent turns"),
+    ] = None,
+    timeout: Annotated[
+        int | None,
+        typer.Option("--timeout", help="Timeout in seconds"),
+    ] = None,
+    # Feature flags — None means "use config.toml default" (same as TUI)
+    web_search: Annotated[
+        bool | None,
+        typer.Option("--web-search/--no-web-search", help="Enable web search (from config)"),
+    ] = None,
+    web_fetch: Annotated[
+        bool | None,
+        typer.Option("--web-fetch/--no-web-fetch", help="Enable web fetch (default: from config)"),
+    ] = None,
+    thinking: Annotated[
+        str | None,
+        typer.Option("--thinking", help="Thinking effort: minimal/low/medium/high/xhigh or false"),
+    ] = None,
+    include_todo: Annotated[
+        bool | None,
+        typer.Option("--todo/--no-todo", help="Enable task planning (default: from config)"),
+    ] = None,
+    include_subagents: Annotated[
+        bool | None,
+        typer.Option(
+            "--subagents/--no-subagents", help="Enable subagent delegation (default: from config)"
+        ),
+    ] = None,
+    include_skills: Annotated[
+        bool | None,
+        typer.Option("--skills/--no-skills", help="Enable skills (default: from config)"),
+    ] = None,
+    include_plan: Annotated[
+        bool | None,
+        typer.Option("--plan/--no-plan", help="Enable plan mode (default: from config)"),
+    ] = None,
+    include_memory: Annotated[
+        bool | None,
+        typer.Option("--memory/--no-memory", help="Enable persistent memory (from config)"),
+    ] = None,
+    include_teams: Annotated[
+        bool | None,
+        typer.Option("--teams/--no-teams", help="Enable agent teams (from config)"),
+    ] = None,
+    context_discovery: Annotated[
+        bool | None,
+        typer.Option("--context/--no-context", help="Auto-discover AGENTS.md (from config)"),
+    ] = None,
+    temperature: Annotated[
+        float | None,
+        typer.Option("--temperature", help="Sampling temperature (default: 0.0)"),
+    ] = None,
+    sandbox: Annotated[
+        str | None,
+        typer.Option("--sandbox", "-s", help="Sandbox backend: local or docker (from config)"),
+    ] = None,
+    workspace: Annotated[
+        str | None,
+        typer.Option(
+            "--workspace",
+            help=(
+                "Named Docker workspace shared across threads. "
+                "Packages and state persist between sessions. "
+                "Implies --sandbox docker."
+            ),
+        ),
+    ] = None,
+    verbose: Annotated[
+        bool,
+        typer.Option("--verbose", "-v", help="Stream progress to stderr"),
+    ] = False,
+    include_browser: Annotated[
+        bool | None,
+        typer.Option(
+            "--browser/--no-browser",
+            help="Enable Playwright browser automation (requires pydantic-deep[browser])",
+        ),
+    ] = None,
+    browser_headless: Annotated[
+        bool | None,
+        typer.Option(
+            "--browser-headless/--browser-headed",
+            help="Browser window mode: headless (hidden) or headed (visible, default)",
+        ),
+    ] = None,
+) -> None:
+    """Run a task non-interactively (headless mode).
+
+    Executes a single task and prints the result to stdout.
+    Designed for benchmarks, CI/CD pipelines, and scripted automation.
+
+    All feature flags default to the same values as the TUI (from
+    .pydantic-deep/config.toml). Use --no-web-search, --no-thinking,
+    etc. to override specific features.
+
+    Examples:
+        pydantic-deep run "Fix the failing test in test_auth.py"
+        pydantic-deep run --task-file task.md --json
+        pydantic-deep run "Refactor utils.py" --max-turns 50 --timeout 300
+        pydantic-deep run "Research X" --web-search --web-fetch
+        pydantic-deep run "Fix bug" --no-web-search --no-web-fetch --thinking false
+        pydantic-deep run "Analyze data" --sandbox docker
+        pydantic-deep run "Train model" --workspace ml-env
+    """
+    from apps.cli.run import execute_headless
+
+    # --workspace implies --sandbox docker
+    if workspace and not sandbox:
+        sandbox = "docker"
+
+    if task is None and task_file is None:
+        typer.echo("Error: provide a task argument or --task-file", err=True)
+        raise typer.Exit(1)
+
+    if task_file is not None:
+        if not task_file.exists():
+            typer.echo(f"Error: task file not found: {task_file}", err=True)
+            raise typer.Exit(1)
+        task_text = task_file.read_text().strip()
+    else:
+        assert task is not None
+        task_text = task
+
+    if not task_text:
+        typer.echo("Error: task is empty", err=True)
+        raise typer.Exit(1)
+
+    import asyncio
+
+    result = asyncio.run(
+        execute_headless(
+            task=task_text,
+            working_dir=working_dir or os.getcwd(),
+            model=model,
+            output_json=output_json,
+            max_turns=max_turns,
+            timeout=timeout,
+            web_search=web_search,
+            web_fetch=web_fetch,
+            thinking=thinking,
+            include_todo=include_todo,
+            include_subagents=include_subagents,
+            include_skills=include_skills,
+            include_plan=include_plan,
+            include_memory=include_memory,
+            include_teams=include_teams,
+            context_discovery=context_discovery,
+            temperature=temperature,
+            sandbox=sandbox,
+            workspace=workspace,
+            verbose=verbose,
+            include_browser=include_browser,
+            browser_headless=browser_headless,
+        )
+    )
+    raise typer.Exit(result)
 
 
 @app.command()
@@ -181,6 +389,125 @@ def config_set(
         typer.echo(str(e), err=True)
         raise typer.Exit(1) from None
     typer.echo(f"Set {key} = {value}")
+
+
+# ── Sandbox subcommands ────────────────────────────────────────
+
+sandbox_app = typer.Typer(
+    name="sandbox", help="Manage Docker sandbox workspaces.", no_args_is_help=True
+)
+app.add_typer(sandbox_app)
+
+
+def _get_project_container_prefix() -> str:
+    """Return the Docker container name prefix for the current project."""
+    import hashlib
+
+    dir_hash = hashlib.md5(str(Path.cwd().resolve()).encode()).hexdigest()[:8]
+    return f"pydantic-deep-{dir_hash}-"
+
+
+@sandbox_app.command("list")
+def sandbox_list() -> None:
+    """List Docker sandbox workspaces for this project."""
+    try:
+        import docker
+    except ImportError:
+        typer.echo(
+            "Docker package not installed. Install with: pip install pydantic-ai-backend[docker]",
+            err=True,
+        )
+        raise typer.Exit(1) from None
+
+    prefix = _get_project_container_prefix()
+    client = docker.from_env()
+
+    containers = [c for c in client.containers.list(all=True) if c.name.startswith(prefix)]
+
+    if not containers:
+        typer.echo("No sandbox workspaces found for this project.")
+        return
+
+    console = Console()
+    table = Table(show_header=True, header_style="bold")
+    table.add_column("Workspace", style="cyan")
+    table.add_column("Status")
+    table.add_column("Image", style="dim")
+    table.add_column("Created", style="dim")
+
+    for c in sorted(containers, key=lambda x: x.name):
+        # Strip project prefix to show short workspace name
+        workspace_name = c.name[len(prefix) :]
+        status_style = "green" if c.status == "running" else "yellow"
+        table.add_row(
+            workspace_name,
+            Text(c.status, style=status_style),
+            c.image.tags[0] if c.image.tags else str(c.image.short_id),
+            c.attrs.get("Created", "")[:19],
+        )
+
+    console.print(table)
+    typer.echo(f"\nProject: {Path.cwd()}")
+    typer.echo(f"Prefix:  {prefix}*")
+
+
+@sandbox_app.command("stop")
+def sandbox_stop(
+    name: Annotated[
+        str | None,
+        typer.Argument(help="Workspace name to stop (or 'all')"),
+    ] = None,
+    remove: Annotated[
+        bool,
+        typer.Option("--rm", help="Remove workspace container after stopping"),
+    ] = False,
+) -> None:
+    """Stop sandbox workspaces for this project.
+
+    Examples:
+        pydantic-deep sandbox stop ml-env     # Stop one workspace
+        pydantic-deep sandbox stop all        # Stop all for this project
+        pydantic-deep sandbox stop all --rm   # Stop and remove all
+    """
+    try:
+        import docker
+    except ImportError:
+        typer.echo(
+            "Docker package not installed. Install with: pip install pydantic-ai-backend[docker]",
+            err=True,
+        )
+        raise typer.Exit(1) from None
+
+    if name is None:
+        typer.echo("Provide a workspace name or 'all'.", err=True)
+        raise typer.Exit(1)
+
+    prefix = _get_project_container_prefix()
+    client = docker.from_env()
+
+    if name == "all":
+        targets = [c for c in client.containers.list(all=True) if c.name.startswith(prefix)]
+    else:
+        full_name = f"{prefix}{name}"
+        try:
+            targets = [client.containers.get(full_name)]
+        except docker.errors.NotFound:
+            typer.echo(f"Workspace '{name}' not found.", err=True)
+            raise typer.Exit(1) from None
+
+    for c in targets:
+        short = c.name[len(prefix) :]
+        if c.status == "running":
+            c.stop()
+            typer.echo(f"Stopped: {short}")
+        if remove:
+            c.remove()
+            typer.echo(f"Removed: {short}")
+        elif c.status != "running":
+            typer.echo(f"Already stopped: {short}")
+
+    if not targets:
+        typer.echo("No containers to stop.")
 
 
 # ── Skills subcommands ──────────────────────────────────────────

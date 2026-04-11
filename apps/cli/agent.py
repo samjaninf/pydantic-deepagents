@@ -60,14 +60,17 @@ def create_cli_agent(  # noqa: C901
     summarization_model: str | None = None,
     extra_middleware: list[Any] | None = None,
     backend: Any | None = None,
+    sandbox: str | None = None,
+    sandbox_image: str | None = None,
+    workspace: str | None = None,
     *,
-    include_skills: bool = True,
-    include_plan: bool = True,
-    include_memory: bool = True,
-    include_subagents: bool = True,
-    include_todo: bool = True,
+    include_skills: bool | None = None,
+    include_plan: bool | None = None,
+    include_memory: bool | None = None,
+    include_subagents: bool | None = None,
+    include_todo: bool | None = None,
     include_local_context: bool = True,
-    context_discovery: bool = True,
+    context_discovery: bool | None = None,
     non_interactive: bool = False,
     lean: bool = False,
     config_path: Path | None = None,
@@ -75,6 +78,13 @@ def create_cli_agent(  # noqa: C901
     session_id: str | None = None,
     skills_dir: str | None = None,
     extra_instructions: str | None = None,
+    web_search: bool | None = None,
+    web_fetch: bool | None = None,
+    thinking: bool | str | None = None,
+    include_teams: bool | None = None,
+    temperature: float | None = None,
+    include_browser: bool | None = None,
+    browser_headless: bool | None = None,
 ) -> tuple[Any, DeepAgentDeps]:
     """Create a CLI-configured agent with all pydantic-deep capabilities.
 
@@ -88,6 +98,17 @@ def create_cli_agent(  # noqa: C901
         on_context_update: Callback for context usage updates.
         extra_middleware: Additional middleware to include.
         backend: Override the file storage backend (e.g., DockerSandbox).
+            Takes precedence over ``sandbox``.
+        sandbox: Sandbox type: ``"local"`` or ``"docker"``. When ``"docker"``,
+            creates a DockerSandbox with the working directory mounted at
+            ``/workspace``. Falls back to ``config.sandbox``.
+        sandbox_image: Docker image for the sandbox container. Falls back to
+            ``config.sandbox_image`` (default: ``python:3.12-slim``).
+        workspace: Named Docker workspace shared across threads. When set, the
+            container persists between sessions so installed packages and any
+            files outside the mounted volume survive restarts. Multiple threads
+            (conversation histories) can share the same workspace. The actual
+            Docker container name is ``pydantic-deep-{dir_hash}-{workspace}``.
         include_skills: Whether to include the skills toolset.
         include_plan: Whether to include the planner subagent.
         include_memory: Whether to include persistent agent memory.
@@ -115,7 +136,29 @@ def create_cli_agent(  # noqa: C901
     effective_allow_list = shell_allow_list or config.shell_allow_list or None
 
     root = Path(effective_working_dir) if effective_working_dir else Path.cwd()
-    effective_backend = backend or LocalBackend(root_dir=root)
+
+    # Resolve sandbox: explicit param > config
+    effective_sandbox = sandbox or config.sandbox
+    if effective_sandbox == "docker" and backend is None:
+        from pydantic_ai_backends import DockerSandbox
+
+        docker_kwargs: dict[str, Any] = {
+            "volumes": {str(root.resolve()): "/workspace"},
+            "work_dir": "/workspace",
+            "image": sandbox_image or config.sandbox_image,
+        }
+
+        # Named workspace → reusable container (packages + state persist between threads)
+        # No workspace → ephemeral container (clean slate every time)
+        if workspace:
+            import hashlib
+
+            dir_hash = hashlib.md5(str(root.resolve()).encode()).hexdigest()[:8]
+            docker_kwargs["container_name"] = f"pydantic-deep-{dir_hash}-{workspace}"
+
+        effective_backend: Any = DockerSandbox(**docker_kwargs)
+    else:
+        effective_backend = backend or LocalBackend(root_dir=root)
 
     # Build hooks list
     hooks: list[Hook] = []
@@ -134,10 +177,12 @@ def create_cli_agent(  # noqa: C901
     )
 
     # Append working directory context
+    # When using Docker sandbox, the agent operates inside the container at /workspace
+    instruction_root = "/workspace" if effective_sandbox == "docker" else str(root.resolve())
     working_dir_section = (
         f"\n\n## Working Directory\n\n"
-        f"You are operating in: `{root.resolve()}`\n\n"
-        f"All file paths must be absolute, starting with `{root.resolve()}`."
+        f"You are operating in: `{instruction_root}`\n\n"
+        f"All file paths must be absolute, starting with `{instruction_root}`."
     )
     instructions += working_dir_section
 
@@ -191,25 +236,36 @@ def create_cli_agent(  # noqa: C901
             {tool: True for tool in config.approve_tools} if config.approve_tools else None
         )
 
-    effective_memory = include_memory and not non_interactive
-    effective_skills = include_skills if not lean else False  # Lean: no skills noise
-    effective_plan = include_plan and not non_interactive
-    effective_subagents = include_subagents if not lean else False  # Lean: no subagents
-    effective_todo = include_todo if not lean else False  # Lean: no todo overhead
+    # Resolve feature flags: explicit param > config.toml > lean override
+    _skills = include_skills if include_skills is not None else config.include_skills
+    _plan = include_plan if include_plan is not None else config.include_plan
+    _memory = include_memory if include_memory is not None else config.include_memory
+    _subagents = include_subagents if include_subagents is not None else config.include_subagents
+    _todo = include_todo if include_todo is not None else config.include_todo
+    _context_disc = context_discovery if context_discovery is not None else config.context_discovery
 
-    # Model settings — non-interactive defaults, then config, then explicit overrides
+    effective_skills = _skills if not lean else False
+    effective_plan = _plan if not lean else False
+    effective_memory = _memory if not lean else False
+    effective_subagents = _subagents if not lean else False
+    effective_todo = _todo if not lean else False
+
+    _browser = include_browser if include_browser is not None else config.include_browser
+    effective_browser = _browser if not lean else False
+
+    # Model settings — explicit param > model_settings dict > non-interactive > config
     effective_model_settings: dict[str, Any] = {}
     if non_interactive:
         effective_model_settings["temperature"] = 0.0
-    # Config-level defaults (lowest priority after non-interactive)
     if config.temperature is not None and "temperature" not in (model_settings or {}):
         effective_model_settings["temperature"] = config.temperature
     if config.reasoning_effort and "openai_reasoning_effort" not in (model_settings or {}):
         effective_model_settings["openai_reasoning_effort"] = config.reasoning_effort
-    # Thinking is handled via Thinking capability, not model_settings
-    # Explicit CLI flags override everything
     if model_settings:
         effective_model_settings.update(model_settings)
+    # Explicit temperature param has highest priority
+    if temperature is not None:
+        effective_model_settings["temperature"] = temperature
 
     # Per-session plans directory (relative to backend root)
     if session_id:
@@ -223,6 +279,25 @@ def create_cli_agent(  # noqa: C901
 
         session_dir = get_sessions_dir() / session_id
         session_dir.mkdir(parents=True, exist_ok=True)
+
+    # Build extra capabilities list (browser, future additions)
+    extra_capabilities: list[Any] = []
+    if effective_browser:
+        try:
+            from pydantic_deep.capabilities.browser import BrowserCapability
+
+            effective_headless = (
+                browser_headless if browser_headless is not None else config.browser_headless
+            )
+            extra_capabilities.append(BrowserCapability(headless=effective_headless))
+        except ImportError:
+            import warnings
+
+            warnings.warn(
+                "BrowserCapability requires playwright. "
+                "Install with: pip install 'pydantic-deep[browser]' && playwright install chromium",
+                stacklevel=2,
+            )
 
     agent = create_deep_agent(
         model=effective_model,
@@ -247,16 +322,22 @@ def create_cli_agent(  # noqa: C901
         include_memory=effective_memory,
         memory_dir=".pydantic-deep",
         # Context files (auto-discover AGENTS.md, SOUL.md)
-        context_discovery=context_discovery if not lean else False,
+        context_discovery=_context_disc if not lean else False,
         # Teams
-        include_teams=config.include_teams,
+        include_teams=(include_teams if include_teams is not None else config.include_teams),
         # Self-improvement
         include_improve=True,
-        # Web tools
-        web_search=config.web_search if not lean else False,
-        web_fetch=config.web_fetch if not lean else False,
+        # Web tools — explicit params override config
+        web_search=(
+            web_search if web_search is not None else (config.web_search if not lean else False)
+        ),
+        web_fetch=(
+            web_fetch if web_fetch is not None else (config.web_fetch if not lean else False)
+        ),
         # Thinking
-        thinking=config.thinking_effort if not lean else False,
+        thinking=(
+            thinking if thinking is not None else (config.thinking_effort if not lean else False)
+        ),
         # History persistence — per-session messages.json
         history_messages_path=(
             f".pydantic-deep/sessions/{session_id}/messages.json"
@@ -281,6 +362,7 @@ def create_cli_agent(  # noqa: C901
         hooks=hooks or None,
         middleware=middleware or None,
         toolsets=[local_context] if local_context else None,
+        capabilities=extra_capabilities or None,
     )
 
     # Extract context middleware for CLI commands (/compact, /context)

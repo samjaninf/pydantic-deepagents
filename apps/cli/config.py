@@ -61,10 +61,14 @@ _BOOL_FIELDS = frozenset(
         "show_cost",
         "show_tokens",
         "logfire",
+        "include_browser",
+        "browser_headless",
     }
 )
 
-_STR_FIELDS = frozenset({"model", "theme", "charset", "reasoning_effort", "thinking_effort"})
+_STR_FIELDS = frozenset(
+    {"model", "theme", "charset", "reasoning_effort", "thinking_effort", "sandbox", "sandbox_image"}
+)
 
 _INT_FIELDS = frozenset({"max_history", "thinking_budget"})
 
@@ -75,7 +79,7 @@ _FLOAT_FIELDS = frozenset({"temperature"})
 class CliConfig:
     """CLI configuration loaded from config.toml."""
 
-    model: str = "anthropic:claude-sonnet-4-6"
+    model: str = "anthropic:claude-opus-4-6"
     working_dir: str | None = None
     shell_allow_list: list[str] = field(default_factory=list)
     theme: str = "default"
@@ -98,7 +102,15 @@ class CliConfig:
     """Tool names that require user approval before execution."""
     temperature: float | None = None
     reasoning_effort: str | None = None
+    sandbox: str = "local"
+    """Sandbox backend: ``"local"`` (default) or ``"docker"``."""
+    sandbox_image: str = "python:3.12-slim"
+    """Docker image used when ``sandbox = "docker"``."""
     logfire: bool = False
+    include_browser: bool = False
+    """Enable browser automation via Playwright (requires ``pydantic-deep[browser]``)."""
+    browser_headless: bool = False
+    """Run browser without a visible window. Default ``False`` — browser window is shown."""
 
 
 def load_config(path: Path | None = None) -> CliConfig:
@@ -142,7 +154,7 @@ def validate_config(config: CliConfig) -> list[str]:
     warnings: list[str] = []
     if config.model and ":" not in config.model:
         warnings.append(
-            f"Model '{config.model}' missing provider prefix (e.g. 'anthropic:claude-sonnet-4-6')"
+            f"Model '{config.model}' missing provider prefix (e.g. 'anthropic:claude-opus-4-6')"
         )
     if config.working_dir:
         from pathlib import Path as _Path
@@ -158,6 +170,11 @@ def validate_config(config: CliConfig) -> list[str]:
     if config.charset not in known_charsets:
         warnings.append(
             f"Unknown charset '{config.charset}'. Known: {', '.join(sorted(known_charsets))}"
+        )
+    known_sandboxes = {"local", "docker"}
+    if config.sandbox not in known_sandboxes:
+        warnings.append(
+            f"Unknown sandbox '{config.sandbox}'. Known: {', '.join(sorted(known_sandboxes))}"
         )
     if config.max_history < 0:
         warnings.append("max_history must be non-negative")
