@@ -38,8 +38,9 @@ dependencies = [
 sandbox = ["pydantic-ai-backend[docker]>=0.2.4"]
 # YAML support for skills (pyyaml-based frontmatter parsing)
 yaml = ["pyyaml>=6.0"]
-# CLI tools (for interactive chat examples)
+# CLI tools + TUI (terminal assistant)
 cli = [
+    "textual>=3.0.0",
     "typer>=0.12.0",
     "rich>=13.0.0",
     "prompt-toolkit>=3.0.0",

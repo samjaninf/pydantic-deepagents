@@ -28,6 +28,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The check is backed by a 24-hour file cache (`~/.pydantic-deep/update_check.json`) so the network
   is only hit once per day. A 2-second timeout ensures the check never blocks startup
 
+### Fixed
+
+- **`ModuleNotFoundError: No module named 'textual'` on fresh install** — `textual` was listed under the
+  `tui` optional extra but missing from `cli`, so `uv tool install "pydantic-deep[cli]"` produced a broken
+  installation that crashed immediately on launch. `textual>=3.0.0` is now included in both `cli` and `tui`
+
 ## [0.3.5] - 2026-04-10
 
 ### Added
