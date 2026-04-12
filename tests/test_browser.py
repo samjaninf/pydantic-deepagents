@@ -627,7 +627,7 @@ class TestBrowserCapability:
 
     @pytest.mark.asyncio
     async def test_wrap_run_proceeds_without_browser_when_launch_fails(self) -> None:
-        """When Chromium binary is missing and auto-install fails, handler runs with launch_error."""
+        """When Chromium binary is missing and auto-install fails, handler runs."""
         cap = BrowserCapability()
         pw, browser, page = _make_playwright_mock()
         browser.new_page = AsyncMock(return_value=page)

@@ -22,6 +22,11 @@ Example:
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+from typing import Any
+
+from pydantic_ai import RunContext
+from pydantic_ai.capabilities import AbstractCapability
 from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
@@ -200,13 +205,6 @@ def patch_tool_calls_processor(
         messages = patched2
 
     return messages
-
-
-from dataclasses import dataclass
-from typing import Any
-
-from pydantic_ai import RunContext
-from pydantic_ai.capabilities import AbstractCapability
 
 
 @dataclass

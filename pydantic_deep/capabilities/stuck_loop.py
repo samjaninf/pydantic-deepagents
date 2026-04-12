@@ -56,7 +56,7 @@ def _hash_args(args: dict[str, Any]) -> str:
         serialized = json.dumps(args, sort_keys=True, default=str)
     except (TypeError, ValueError):  # pragma: no cover
         serialized = str(args)
-    return hashlib.md5(serialized.encode()).hexdigest()  # noqa: S324
+    return hashlib.md5(serialized.encode()).hexdigest()
 
 
 def _hash_result(result: Any) -> str:
@@ -68,7 +68,7 @@ def _hash_result(result: Any) -> str:
             serialized = json.dumps(result, sort_keys=True, default=str)
     except (TypeError, ValueError):  # pragma: no cover
         serialized = str(result)
-    return hashlib.md5(serialized.encode()).hexdigest()  # noqa: S324
+    return hashlib.md5(serialized.encode()).hexdigest()
 
 
 @dataclass

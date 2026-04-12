@@ -14,11 +14,9 @@ from pydantic_ai.messages import (
     UserPromptPart,
 )
 from pydantic_ai.models.test import TestModel
-from pydantic_ai.tools import RunContext
+from pydantic_ai.tools import RunContext, ToolDefinition
 from pydantic_ai.usage import RunUsage
 from pydantic_ai_backends import StateBackend, WriteResult
-
-from pydantic_ai.tools import ToolDefinition
 
 from pydantic_deep import (
     DEFAULT_EVICTION_PATH,
@@ -1065,7 +1063,6 @@ class TestEvictionCapability:
         """When backend write fails, original result is returned unchanged."""
         backend = StateBackend()
         # Monkey-patch write to return an error
-        original_write = backend.write
 
         def failing_write(path: str, content: str | bytes) -> WriteResult:
             return WriteResult(path=path, error="disk full")

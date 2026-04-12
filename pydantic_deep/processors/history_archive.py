@@ -287,7 +287,9 @@ def create_history_search_toolset(
             results.append(f"[score: {score:.1f}]\n{excerpt}")
 
         if not results:  # pragma: no cover
-            return f"No matches for '{query}' in {len(messages)} archived messages."  # pragma: no cover
+            return (  # pragma: no cover
+                f"No matches for '{query}' in {len(messages)} archived messages."
+            )
 
         header = (
             f"Found {len(results)} match(es) for '{query}' "

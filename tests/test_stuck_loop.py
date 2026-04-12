@@ -274,10 +274,7 @@ class TestAgentIntegration:
         root = getattr(agent, "_root_capability", None)
         if root is None:
             return False  # pragma: no cover
-        for cap in getattr(root, "capabilities", []):
-            if isinstance(cap, StuckLoopDetection):
-                return True
-        return False
+        return any(isinstance(cap, StuckLoopDetection) for cap in getattr(root, "capabilities", []))
 
     def test_enabled_by_default(self):
         agent = create_deep_agent(
