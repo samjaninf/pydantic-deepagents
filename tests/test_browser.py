@@ -83,7 +83,10 @@ class TestAutoInstallChromium:
         mock_proc.returncode = 0
         mock_proc.communicate = AsyncMock(return_value=(b"", b""))
 
-        with patch("pydantic_deep.capabilities.browser.asyncio.create_subprocess_exec", return_value=mock_proc):
+        with patch(
+            "pydantic_deep.capabilities.browser.asyncio.create_subprocess_exec",
+            return_value=mock_proc,
+        ):
             result = await _auto_install_chromium()
 
         assert result is True
@@ -95,7 +98,10 @@ class TestAutoInstallChromium:
         mock_proc.returncode = 1
         mock_proc.communicate = AsyncMock(return_value=(b"", b"some error"))
 
-        with patch("pydantic_deep.capabilities.browser.asyncio.create_subprocess_exec", return_value=mock_proc):
+        with patch(
+            "pydantic_deep.capabilities.browser.asyncio.create_subprocess_exec",
+            return_value=mock_proc,
+        ):
             result = await _auto_install_chromium()
 
         assert result is False
