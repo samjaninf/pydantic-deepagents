@@ -1,6 +1,6 @@
 [project]
 name = "pydantic-deep"
-version = "0.3.11"
+version = "0.3.12"
 description = "Batteries-included agent harness for Python — tool-calling, sandboxed execution, multi-agent teams, and unlimited context on Pydantic AI"
 readme = "README.md"
 keywords = [
@@ -120,11 +120,13 @@ dev = [
     "build>=1.3.0",
     "twine>=6.2.0",
     "pre-commit>=4.5.1",
+    "griffe>=1.15.0",
 ]
 lint = [
     "ruff>=0.8.0",
     "pyright>=1.1.0",
     "mypy>=1.0.0",
+    "bandit>=1.8.0",
 ]
 docs = [
     "mkdocs>=1.6.0",

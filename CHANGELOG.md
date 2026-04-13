@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.12] - 2026-04-13
+
+### Added
+
+- **Bandit security scanner** — [Bandit](https://bandit.readthedocs.io/) is now part of the development toolchain and CI pipeline. It runs on every commit via the new `security` job in GitHub Actions and is also available locally via `make security`. The scanner checks production code (`pydantic_deep/`) for common Python security vulnerabilities (CWE-listed issues). No medium- or high-severity findings block a merge.
+- **GitHub Issue Templates** — structured forms for bug reports and feature requests guide contributors to provide the right information. Blank issues are disabled; the config redirects security reports to `security@vstorm.co`.
+- **Pull Request Template** — a checklist-based PR template ensures contributors verify tests, linting, type checking, and the security scan before requesting review.
+
+### Fixed
+
+- **MD5 `usedforsecurity` flag (`StuckLoopDetection`)** — `hashlib.md5()` calls used for tool-call fingerprinting in `stuck_loop.py` now pass `usedforsecurity=False`, correctly signalling that the hash is used for deduplication (not cryptographic security). This resolves a Bandit B324 High-severity finding.
+
+### Changed
+
+- **CONTRIBUTING.md** — expanded with an explicit test policy (new functionality requires tests; 100 % coverage is enforced mechanically), a coding-standards reference table (Ruff, Pyright, MyPy, Bandit with `pyproject.toml` links), English-language requirement, API docs pointer, and a static-analysis section documenting all quality gates.
+- **`make all`** — now includes `make security` (Bandit scan) in addition to the existing format → lint → typecheck → testcov sequence.
+
 ## [0.3.11] - 2026-04-13
 
 ### Fixed
