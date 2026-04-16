@@ -86,7 +86,7 @@ class TestCreateDeepAgent:
                 web_search=parent_web_search,
                 web_fetch=parent_web_fetch,
             )
-            factory = subagents[0]["agent_factory"]  # type: ignore[typeddict-item]
+            factory = subagents[0]["agent_factory"]
             assert factory is not None
             sub_agent = factory({"instructions": "sub instructions", "model": TEST_MODEL})
             return [type(c) for c in sub_agent._root_capability.capabilities]
