@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.15] - 2026-04-17
+
+### Fixed
+
+- **`PatchToolCallsCapability` caused `ValidationException: duplicate Ids` on Bedrock when tools raised `ModelRetry`** — when a tool raised `ModelRetry`, pydantic-ai records the retry as a `RetryPromptPart` (carrying the original `tool_call_id`) on the following `ModelRequest`, not as a `ToolReturnPart`. The patch processor only scanned for `ToolReturnPart` when deciding whether a `ToolCallPart` was orphaned, so it injected a synthetic `ToolReturnPart` with the same id — leaving the request with two parts sharing one `tool_call_id`. Strict providers (Bedrock `minimax.minimax-m2.5` and others) rejected the request with `The toolResult blocks at messages.N.content contain duplicate Ids`. The processor now treats `RetryPromptPart` as a valid answer to a `ToolCallPart`, so no synthetic return is injected and the history remains valid. ([#79](https://github.com/vstorm-co/pydantic-deepagents/issues/79), reported by [@thatGreekGuy96](https://github.com/thatGreekGuy96))
+
 ## [0.3.14] - 2026-04-16
 
 ### Fixed

@@ -7,6 +7,7 @@ from typing import Any
 from pydantic_ai.messages import (
     ModelRequest,
     ModelResponse,
+    RetryPromptPart,
     TextPart,
     ToolCallPart,
     ToolReturnPart,
@@ -197,6 +198,72 @@ class TestPatchToolCallsProcessor:
 
     def test_cancelled_message_constant(self):
         assert CANCELLED_MESSAGE == "Tool call was cancelled."
+
+    def test_model_retry_not_treated_as_orphan(self):
+        """A `RetryPromptPart` answers the `ToolCallPart` — no synthetic return must be injected.
+
+        Regression for issue #79: when a tool raises `ModelRetry`, pydantic-ai adds a
+        `RetryPromptPart` (not a `ToolReturnPart`) with the same `tool_call_id`. Previously
+        the processor injected a synthetic `ToolReturnPart` with the same id, producing a
+        `ModelRequest` with duplicate tool_call_ids — rejected by Bedrock with
+        `The toolResult blocks ... contain duplicate Ids`.
+        """
+        messages = [
+            ModelRequest(parts=[UserPromptPart(content="hello")]),
+            ModelResponse(parts=[ToolCallPart(tool_name="web_fetch", args={}, tool_call_id="c1")]),
+            ModelRequest(
+                parts=[
+                    RetryPromptPart(
+                        tool_name="web_fetch",
+                        content="Failed to fetch: 404 Not Found",
+                        tool_call_id="c1",
+                    ),
+                ]
+            ),
+        ]
+        result = patch_tool_calls_processor(messages)
+        # History must be unchanged — no synthetic ToolReturnPart injected
+        assert result is messages
+        patched = result[2]
+        assert isinstance(patched, ModelRequest)
+        # Exactly one part, and it's the original RetryPromptPart — no duplicate id
+        assert len(patched.parts) == 1
+        assert isinstance(patched.parts[0], RetryPromptPart)
+        assert patched.parts[0].tool_call_id == "c1"
+
+    def test_mixed_retry_and_return_no_orphans(self):
+        """Parallel tool calls: one answered by `ToolReturnPart`, one by `RetryPromptPart`."""
+        messages = [
+            ModelRequest(parts=[UserPromptPart(content="hello")]),
+            ModelResponse(
+                parts=[
+                    ToolCallPart(tool_name="read", args={}, tool_call_id="c1"),
+                    ToolCallPart(tool_name="fetch", args={}, tool_call_id="c2"),
+                ]
+            ),
+            ModelRequest(
+                parts=[
+                    ToolReturnPart(tool_name="read", content="data", tool_call_id="c1"),
+                    RetryPromptPart(
+                        tool_name="fetch",
+                        content="try again",
+                        tool_call_id="c2",
+                    ),
+                ]
+            ),
+        ]
+        result = patch_tool_calls_processor(messages)
+        assert result is messages
+        patched = result[2]
+        assert isinstance(patched, ModelRequest)
+        # No synthetic parts added — exactly the two original answers
+        assert len(patched.parts) == 2
+        ids = {
+            p.tool_call_id
+            for p in patched.parts
+            if isinstance(p, (ToolReturnPart, RetryPromptPart))
+        }
+        assert ids == {"c1", "c2"}
 
     # --- Phase 2: orphaned tool results (missing calls) ---
 
