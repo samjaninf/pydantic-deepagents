@@ -31,6 +31,7 @@ from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
     ModelResponse,
+    RetryPromptPart,
     ToolCallPart,
     ToolReturnPart,
 )
@@ -64,7 +65,14 @@ def _find_orphaned_calls(messages: list[ModelMessage]) -> dict[int, list[ToolRet
 
         if isinstance(next_msg, ModelRequest):
             for req_part in next_msg.parts:
-                if isinstance(req_part, ToolReturnPart) and req_part.tool_call_id in tool_calls:
+                # A `RetryPromptPart` carries the original `tool_call_id` when a tool raises
+                # `ModelRetry` (see pydantic-ai `_tool_manager._wrap_error_as_retry`), so it
+                # counts as an answer to the call — otherwise we'd inject a synthetic
+                # `ToolReturnPart` with the same id and trip strict providers like Bedrock.
+                if (
+                    isinstance(req_part, (ToolReturnPart, RetryPromptPart))
+                    and req_part.tool_call_id in tool_calls
+                ):
                     answered_ids.add(req_part.tool_call_id)
 
         # Find orphaned tool calls
