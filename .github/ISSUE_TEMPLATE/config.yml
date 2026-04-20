@@ -4,7 +4,7 @@ contact_links:
     url: https://github.com/vstorm-co/pydantic-deepagents/blob/main/SECURITY.md
     about: >
       Do NOT open a public issue for security vulnerabilities.
-      Please email security@vstorm.co instead (see SECURITY.md for details).
+      Please email info@vstorm.co instead (see SECURITY.md for details).
   - name: Documentation
     url: https://vstorm-co.github.io/pydantic-deepagents/
     about: Check the documentation first — your question may already be answered there.

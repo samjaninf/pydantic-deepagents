@@ -28,7 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Bandit security scanner** — [Bandit](https://bandit.readthedocs.io/) is now part of the development toolchain and CI pipeline. It runs on every commit via the new `security` job in GitHub Actions and is also available locally via `make security`. The scanner checks production code (`pydantic_deep/`) for common Python security vulnerabilities (CWE-listed issues). No medium- or high-severity findings block a merge.
-- **GitHub Issue Templates** — structured forms for bug reports and feature requests guide contributors to provide the right information. Blank issues are disabled; the config redirects security reports to `security@vstorm.co`.
+- **GitHub Issue Templates** — structured forms for bug reports and feature requests guide contributors to provide the right information. Blank issues are disabled; the config redirects security reports to `info@vstorm.co`.
 - **Pull Request Template** — a checklist-based PR template ensures contributors verify tests, linting, type checking, and the security scan before requesting review.
 
 ### Fixed

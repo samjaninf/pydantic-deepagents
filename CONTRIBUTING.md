@@ -5,7 +5,7 @@ Thanks for your interest in contributing! Bug reports, enhancement proposals, an
 ## Getting Help / Reporting Issues
 
 - **Bug reports & feature requests** — [open a GitHub Issue](https://github.com/vstorm-co/pydantic-deepagents/issues)
-- **Security vulnerabilities** — email **security@vstorm.co** (do NOT use public Issues; see [SECURITY.md](SECURITY.md))
+- **Security vulnerabilities** — email **info@vstorm.co** (do NOT use public Issues; see [SECURITY.md](SECURITY.md))
 - **Questions & discussion** — GitHub Issues are the primary discussion channel and are publicly searchable
 
 All issues and pull requests are archived publicly on GitHub and can be referenced by URL.

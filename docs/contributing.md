@@ -39,7 +39,7 @@ New functionality **must** include tests. The `coverage fail_under = 100` settin
 
 - **Bug reports** — [open a GitHub Issue](https://github.com/vstorm-co/pydantic-deepagents/issues/new/choose) using the Bug Report template
 - **Feature requests** — [open a GitHub Issue](https://github.com/vstorm-co/pydantic-deepagents/issues/new/choose) using the Feature Request template
-- **Security vulnerabilities** — email **security@vstorm.co** (see [Security Policy](https://github.com/vstorm-co/pydantic-deepagents/blob/main/SECURITY.md))
+- **Security vulnerabilities** — email **info@vstorm.co** (see [Security Policy](https://github.com/vstorm-co/pydantic-deepagents/blob/main/SECURITY.md))
 
 ## Full Guidelines
 
