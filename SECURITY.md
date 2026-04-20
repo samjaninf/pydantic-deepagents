@@ -15,7 +15,7 @@ Only the latest minor release receives security fixes. We recommend always using
 
 To report a vulnerability, email the maintainers at:
 
-**security@vstorm.co**
+**info@vstorm.co**
 
 Include in your report:
 - Description of the vulnerability
