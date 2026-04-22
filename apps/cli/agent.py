@@ -170,9 +170,13 @@ def create_cli_agent(  # noqa: C901
     if extra_middleware:
         middleware.extend(extra_middleware)
 
-    instructions = DEFAULT_INSTRUCTIONS + "\n\n" + build_cli_instructions(
-        non_interactive=non_interactive,
-        lean=lean,
+    instructions = (
+        DEFAULT_INSTRUCTIONS
+        + "\n\n"
+        + build_cli_instructions(
+            non_interactive=non_interactive,
+            lean=lean,
+        )
     )
 
     # Append working directory context
