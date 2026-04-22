@@ -33,6 +33,8 @@ agent = create_deep_agent(model=TestModel())
 
 ### Custom Instructions
 
+The `instructions` parameter sets the agent's system prompt. When provided, it **replaces** the built-in [`BASE_PROMPT`][pydantic_deep.prompts.BASE_PROMPT] entirely:
+
 ```python
 agent = create_deep_agent(
     instructions="""
@@ -45,6 +47,24 @@ agent = create_deep_agent(
     """
 )
 ```
+
+To build on top of the default behavior instead of replacing it, import `BASE_PROMPT` and compose with an f-string:
+
+```python
+from pydantic_deep import BASE_PROMPT, create_deep_agent
+
+agent = create_deep_agent(
+    instructions=f"""{BASE_PROMPT}
+
+    ## Extra Guidelines
+
+    You are a Python expert. Always use type hints and docstrings.
+    """
+)
+```
+
+!!! note "Subagent instructions work differently"
+    The `instructions` field in [`SubAgentConfig`][pydantic_deep.types.SubAgentConfig] is always **appended** to `BASE_PROMPT` automatically — you only write the specialized part. This keeps subagent configs concise.
 
 ### Enabling/Disabling Features
 
@@ -321,7 +341,7 @@ Pydantic Deep Agents uses a dynamic system prompt mechanism that automatically c
 ```python
 # The agent automatically includes relevant prompts based on enabled features
 agent = create_deep_agent(
-    instructions="You are a Python expert.",  # Your base instructions
+    instructions="You are a Python expert.",  # Replaces BASE_PROMPT
     include_todo=True,        # Adds todo prompt
     include_filesystem=True,  # Adds console prompt
     include_subagents=True,   # Adds subagent prompt
@@ -329,7 +349,7 @@ agent = create_deep_agent(
 )
 
 # At runtime, the agent sees:
-# 1. Your instructions: "You are a Python expert."
+# 1. Static instructions: "You are a Python expert."  (or BASE_PROMPT if instructions=None)
 # 2. Uploaded files: "## Uploaded Files\n- /uploads/data.csv (1024 bytes, 50 lines)"
 # 3. Todo prompt: "## Current Todos\n- [ ] Analyze data..."
 # 4. Console prompt: "## File Operations\nYou can use ls, read_file, write_file..."

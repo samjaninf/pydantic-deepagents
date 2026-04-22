@@ -203,8 +203,6 @@ def build_cli_instructions(
     if non_interactive and lean:
         return _LEAN_NON_INTERACTIVE
 
-    # NOTE: BASE_PROMPT is prepended by create_deep_agent() — do NOT include it here.
-    # CLI prompt only adds CLI-specific sections on top of the framework base.
     parts: list[str] = [_CLI_CORE, _CODE_QUALITY_SECTION]
 
     if non_interactive:

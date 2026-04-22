@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.16] - 2026-04-22
+
+### Changed
+
+- **`instructions` now replaces `BASE_PROMPT` instead of appending to it** — previously, passing `instructions="..."` to `create_deep_agent()` produced a system prompt of `BASE_PROMPT + "\n\n" + instructions`. Now `instructions` is used verbatim as the full system prompt. `instructions=None` (the default) keeps the existing behaviour — `BASE_PROMPT` is used automatically. Users who want to extend the default rather than replace it can do so with an f-string: `instructions=f"{BASE_PROMPT}\n\nYour extra text"`. `BASE_PROMPT` is exported from the top-level package. ([#84](https://github.com/vstorm-co/pydantic-deepagents/issues/84), reported by [@rremilian](https://github.com/rremilian))
+- **Subagent and team-member factories always prepend `BASE_PROMPT`** — agents spawned automatically by the `task()` tool or `spawn_team()` continue to receive `BASE_PROMPT` followed by their task-specific `instructions`, so subagent behaviour is unchanged.
+- **`apps/deepresearch` double-prompt bug fixed** — `MAIN_INSTRUCTIONS` already contained `BASE_PROMPT`; it was previously duplicated in the final system prompt because the old append logic prepended it again. The new semantics resolve this without any change to the deepresearch app itself.
+
 ## [0.3.15] - 2026-04-17
 
 ### Fixed

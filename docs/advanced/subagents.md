@@ -72,7 +72,7 @@ task(
 This:
 
 1. Creates a **deep agent** (`create_deep_agent()`) with:
-   - `BASE_PROMPT` + subagent's `instructions` as system prompt
+   - `BASE_PROMPT` prepended to the subagent's `instructions` as system prompt
    - Filesystem, web, todo, memory tools
    - Eviction and patch tool calls support
 2. Clones dependencies with:

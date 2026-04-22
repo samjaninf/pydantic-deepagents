@@ -8,7 +8,7 @@ from typing import Any
 from pydantic_ai_backends import LocalBackend
 
 from apps.cli.prompts import build_cli_instructions
-from pydantic_deep.agent import create_deep_agent
+from pydantic_deep.agent import DEFAULT_INSTRUCTIONS, create_deep_agent
 from pydantic_deep.capabilities.hooks import Hook, HookEvent, HookInput, HookResult
 from pydantic_deep.deps import DeepAgentDeps
 
@@ -170,10 +170,13 @@ def create_cli_agent(  # noqa: C901
     if extra_middleware:
         middleware.extend(extra_middleware)
 
-    # Build dynamic system prompt (tool-specific guidance lives in tool descriptions)
-    instructions = build_cli_instructions(
-        non_interactive=non_interactive,
-        lean=lean,
+    instructions = (
+        DEFAULT_INSTRUCTIONS
+        + "\n\n"
+        + build_cli_instructions(
+            non_interactive=non_interactive,
+            lean=lean,
+        )
     )
 
     # Append working directory context

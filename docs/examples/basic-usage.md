@@ -158,7 +158,7 @@ Usage Statistics:
 ```python
 agent = create_deep_agent(
     model="anthropic:claude-sonnet-4-6",  # LLM model
-    instructions="...",                           # System prompt
+    instructions="...",                   # System prompt (replaces built-in BASE_PROMPT)
 )
 ```
 
