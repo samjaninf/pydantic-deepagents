@@ -36,6 +36,7 @@
 
 ## What's New
 
+- **2026-04-22** &nbsp;**v0.3.16** — `instructions=` now replaces `BASE_PROMPT` directly. Use `f"{BASE_PROMPT}\n\n..."` to extend it. Subagents still get `BASE_PROMPT` automatically.
 - **2026-04-12** &nbsp;**v0.3.8** — Stuck loop detection, context limit warnings for the model, expanded context file discovery (CLAUDE.md, .cursorrules, etc.), eviction & orphan repair migrated to capabilities hooks.
 - **2026-04-11** &nbsp;**v0.3.6** — One-command installer + self-update: `curl -fsSL .../install.sh | bash` installs everything automatically. New `pydantic-deep update` command. Startup update notifications with 24-hour PyPI cache.
 - **2026-04-10** &nbsp;**v0.3.5** — Headless runner (`pydantic-deep run`), Docker sandbox with named workspaces, browser automation via Playwright, Harbor adapter for Terminal Bench evaluation.

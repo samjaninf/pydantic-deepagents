@@ -99,6 +99,41 @@ class TestCreateDeepAgent:
         assert WebSearch in on_types
         assert WebFetch in on_types
 
+    def test_default_subagent_factory_prepends_base_prompt(self):
+        """Subagent factory always prepends BASE_PROMPT before task instructions."""
+        from pydantic_deep.prompts import BASE_PROMPT
+
+        subagents: list[SubAgentConfig] = [
+            SubAgentConfig(
+                name="researcher",
+                description="A research agent",
+                instructions="Research topics carefully.",
+            ),
+        ]
+        create_deep_agent(model=TEST_MODEL, subagents=subagents)
+        factory = subagents[0]["agent_factory"]
+        assert factory is not None
+        sub_agent = factory({"instructions": "Research topics carefully.", "model": TEST_MODEL})
+        assert any(BASE_PROMPT in str(i) for i in sub_agent._instructions)
+        assert any("Research topics carefully." in str(i) for i in sub_agent._instructions)
+
+    def test_default_subagent_factory_no_task_instructions(self):
+        """Subagent factory with empty instructions uses only BASE_PROMPT."""
+        from pydantic_deep.prompts import BASE_PROMPT
+
+        subagents: list[SubAgentConfig] = [
+            SubAgentConfig(
+                name="helper",
+                description="A helper agent",
+                instructions="",
+            ),
+        ]
+        create_deep_agent(model=TEST_MODEL, subagents=subagents)
+        factory = subagents[0]["agent_factory"]
+        assert factory is not None
+        sub_agent = factory({"instructions": "", "model": TEST_MODEL})
+        assert any(BASE_PROMPT in str(i) for i in sub_agent._instructions)
+
     def test_create_with_interrupt_on(self):
         """Test creating an agent with interrupt_on config."""
         agent = create_deep_agent(
@@ -133,14 +168,30 @@ class TestBasePrompt:
         # pydantic-ai stores instructions as a normalized list
         assert any(BASE_PROMPT in str(i) for i in agent._instructions)
 
-    def test_custom_instructions_override_base_prompt(self):
+    def test_custom_instructions_replace_base_prompt(self):
         """Custom instructions replace BASE_PROMPT entirely."""
         from pydantic_deep.prompts import BASE_PROMPT
 
         custom = "You are a custom agent."
         agent = create_deep_agent(model=TEST_MODEL, instructions=custom, cost_tracking=False)
         assert any(custom in str(i) for i in agent._instructions)
-        assert not any(str(i) == BASE_PROMPT for i in agent._instructions)
+        assert not any(BASE_PROMPT in str(i) for i in agent._instructions)
+
+    def test_custom_instructions_with_base_prompt_fstring(self):
+        """User can combine BASE_PROMPT with their own instructions via f-string."""
+        from pydantic_deep import BASE_PROMPT
+
+        custom = f"{BASE_PROMPT}\n\nYou are a coding assistant."
+        agent = create_deep_agent(model=TEST_MODEL, instructions=custom, cost_tracking=False)
+        assert any(BASE_PROMPT in str(i) for i in agent._instructions)
+        assert any("coding assistant" in str(i) for i in agent._instructions)
+
+    def test_empty_instructions_uses_base_prompt(self):
+        """instructions=None (default) uses BASE_PROMPT."""
+        from pydantic_deep.prompts import BASE_PROMPT
+
+        agent = create_deep_agent(model=TEST_MODEL, instructions=None, cost_tracking=False)
+        assert any(BASE_PROMPT in str(i) for i in agent._instructions)
 
     def test_create_with_all_capabilities_disabled(self):
         """Agent can be created with all built-in capabilities disabled (all_capabilities empty)."""
