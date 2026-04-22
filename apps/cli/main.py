@@ -273,7 +273,7 @@ def run(
         bool | None,
         typer.Option(
             "--liteparse/--no-liteparse",
-            help="Enable LiteParse document parsing (requires pydantic-deep[liteparse] and Node.js)",
+            help="Enable LiteParse document parsing (requires pydantic-deep[liteparse] + Node.js)",
         ),
     ] = None,
 ) -> None:

@@ -198,3 +198,6 @@ class LiteparseToolset(FunctionToolset[Any]):
         if self._parser is None:
             self._parser = _LiteParse(install_if_not_available=self._install_if_not_available)
         return self._parser
+
+
+LiteparseCliNotFoundError = _CLINotFoundError

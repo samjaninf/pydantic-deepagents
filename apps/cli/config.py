@@ -113,7 +113,9 @@ class CliConfig:
     browser_headless: bool = True
     """Run browser without a visible window. Default ``True`` — browser window is hidden."""
     include_liteparse: bool = True
-    """Enable document parsing via LiteParse (requires ``pydantic-deep[liteparse]`` and Node.js >= 18)."""
+    """Enable document parsing via LiteParse.
+
+    Requires ``pydantic-deep[liteparse]`` and Node.js >= 18."""
 
 
 def load_config(path: Path | None = None) -> CliConfig:

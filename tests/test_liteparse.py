@@ -10,10 +10,11 @@ from pydantic_ai.models.test import TestModel
 from pydantic_ai.usage import RunUsage
 
 from pydantic_deep.toolsets.liteparse import (
+    _NOT_INSTALLED_MSG,
     PARSE_DOCUMENT_DESCRIPTION,
     SCREENSHOT_DOCUMENT_DESCRIPTION,
+    LiteparseCliNotFoundError,
     LiteparseToolset,
-    _NOT_INSTALLED_MSG,
 )
 
 TEST_MODEL = TestModel()
@@ -156,10 +157,8 @@ class TestParseDocument:
         backend._read_bytes.return_value = b"data"
         ctx = _ctx(backend)
 
-        from pydantic_deep.toolsets.liteparse import _CLINotFoundError
-
         mock_parser = MagicMock()
-        mock_parser.parse_async = AsyncMock(side_effect=_CLINotFoundError("CLI missing"))
+        mock_parser.parse_async = AsyncMock(side_effect=LiteparseCliNotFoundError("CLI missing"))
         ts._parser = mock_parser
 
         with patch("pydantic_deep.toolsets.liteparse._HAS_LITEPARSE", True):
@@ -316,10 +315,8 @@ class TestScreenshotDocument:
         backend._read_bytes.return_value = b"data"
         ctx = _ctx(backend)
 
-        from pydantic_deep.toolsets.liteparse import _CLINotFoundError
-
         mock_parser = MagicMock()
-        mock_parser.screenshot_async = AsyncMock(side_effect=_CLINotFoundError("no CLI"))
+        mock_parser.screenshot_async = AsyncMock(side_effect=LiteparseCliNotFoundError("no CLI"))
         ts._parser = mock_parser
 
         with patch("pydantic_deep.toolsets.liteparse._HAS_LITEPARSE", True):

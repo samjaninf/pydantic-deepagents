@@ -136,11 +136,6 @@ from pydantic_deep.styles import (
 )
 from pydantic_deep.toolsets import SkillsToolset, SubAgentToolset, TodoToolset, create_plan_toolset
 from pydantic_deep.toolsets.browser import BrowserToolset
-from pydantic_deep.toolsets.liteparse import (
-    PARSE_DOCUMENT_DESCRIPTION,
-    SCREENSHOT_DOCUMENT_DESCRIPTION,
-    LiteparseToolset,
-)
 from pydantic_deep.toolsets.checkpointing import (
     Checkpoint,
     CheckpointMiddleware,
@@ -160,6 +155,11 @@ from pydantic_deep.toolsets.context import (
     discover_context_files,
     format_context_prompt,
     load_context_files,
+)
+from pydantic_deep.toolsets.liteparse import (
+    PARSE_DOCUMENT_DESCRIPTION,
+    SCREENSHOT_DOCUMENT_DESCRIPTION,
+    LiteparseToolset,
 )
 from pydantic_deep.toolsets.memory import (
     DEFAULT_MAX_MEMORY_LINES,
