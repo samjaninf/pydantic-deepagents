@@ -1311,9 +1311,7 @@ class TestBinaryContentRetention:
             count = 0
             for part in msg.parts:
                 if isinstance(part, UserPromptPart):
-                    items = (
-                        part.content if isinstance(part.content, list) else [part.content]
-                    )
+                    items = part.content if isinstance(part.content, list) else [part.content]
                     count += sum(1 for x in items if isinstance(x, BinaryContent))
             return count
 
@@ -1409,9 +1407,7 @@ class TestBinaryContentRetention:
 
         assert isinstance(old_part.content, list)
         assert not any(isinstance(x, BinaryContent) for x in old_part.content)
-        assert any(
-            isinstance(x, str) and "Binary content omitted" in x for x in old_part.content
-        )
+        assert any(isinstance(x, str) and "Binary content omitted" in x for x in old_part.content)
 
         assert isinstance(new_part.content, list)
         assert any(isinstance(x, BinaryContent) for x in new_part.content)
