@@ -15,6 +15,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - An unreachable server returns the failure as tool text rather than raising out of `agent.run()`, matching how `make_resilient` degrades the tools toolset.
   - New export: `create_mcp_resources_toolset` (also `MCPResourceProvider`, `SKILL_URI_SCHEME`, `SKILL_DOC_NAME` from `pydantic_deep.mcp`).
 
+### Fixed
+
+- **Todo mutations no longer rewrite the system prompt** ([#182](https://github.com/vstorm-co/pydantic-deepagents/issues/182)) (`pydantic_deep/instructions.py`, `pydantic_deep/agent.py`, `pydantic_deep/spec.py`, `pydantic_deep/deps.py`). `create_deep_agent` doesn't use `TodoCapability` — it builds its own instruction providers — so the static-by-default prompt introduced in `pydantic-ai-todo` 0.2.7 never applied here: `make_todo_section` called `get_todo_system_prompt(proxy)`, which appends `## Current Todos` whenever the run has any. The instructions open the provider's prompt-cache prefix, so every `write_todos` / `update_todo_status` invalidated the whole cached prefix mid-run. The todo section is now the static `TODO_SYSTEM_PROMPT`, with the live list behind a new `include_current_todos=True` (also a `DeepAgentSpec` field), matching the upstream flag name. Reported by [@jb2197](https://github.com/jb2197).
+  - The instruction providers no longer touch the todo proxy at all, so `build_instruction_providers` drops its `todo_proxy` argument. `_TodoProxyBinder` re-binds the proxy in each tool's own `contextvars` context (issue [#148](https://github.com/vstorm-co/pydantic-deepagents/issues/148)), which was always the only binding the tools saw. The end-to-end `write_todos` persistence test covers this.
+  - The opt-in list is appended as its own section, so it composes with `tool_search=True` instead of being dropped by the lean todo section.
+  - `DeepAgentDeps.get_todo_prompt()` — until now unused by the library — is what renders that section, and now includes each todo's id (`- [ ] [id] content`, matching upstream) so the model can address a task with `update_todo_status` without re-reading the list.
+  - The 0.3.37 note below claimed pydantic-deep's prompt behavior was unaffected by the upstream default. It wasn't; this is that fix.
+
 ## [0.3.37] - 2026-07-22
 
 A CLI paste fix and raised floors on the vstorm-co packages, bringing backend
