@@ -136,7 +136,10 @@ dev = [
     "griffe>=1.15.0",
 ]
 lint = [
-    "ruff>=0.8.0",
+    # Capped below 0.16: that release started formatting code blocks inside
+    # Markdown, which reformats 49 docs/skill files the repo never linted.
+    # Lift the cap in a dedicated commit that reformats them.
+    "ruff>=0.8.0,<0.16",
     "pyright>=1.1.0",
     "mypy>=1.0.0",
     "bandit>=1.8.0",
