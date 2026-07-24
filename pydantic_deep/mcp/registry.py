@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, cast
 
 from pydantic_deep.mcp.config import _SECRET_AUTH_KINDS, MCPServerConfig
+from pydantic_deep.mcp.resources import create_mcp_resources_toolset
 
 
 def _stdio_log_file(name: str) -> Path:
@@ -187,6 +188,17 @@ def _apply_tool_prefix(
         return toolset
     _MCPToolset, PrefixedToolset, _StdioTransport = _load_mcp_classes()
     return cast("AbstractToolset[Any]", PrefixedToolset(toolset, config.tool_prefix))
+
+
+def _resources_tool_prefix(config: MCPServerConfig) -> str:
+    """Tool-name prefix for a server's resource tools.
+
+    Every server's resources toolset registers the same four tool names, so two
+    servers exposing their resources would collide and pydantic-ai fails the whole
+    run on the duplicate. Prefixing with the server name (sanitised to what tool
+    names allow) keeps them distinct and tells the model which server it is reading.
+    """
+    return config.tool_prefix or re.sub(r"[^A-Za-z0-9_-]", "_", config.name)
 
 
 def build_mcp_server(
@@ -410,7 +422,8 @@ class MCPRegistry:
         A server with ``include_resources`` / ``include_skills`` set contributes a
         second toolset exposing its MCP resources (and ``skill://`` skills) to the
         model. It binds to the same underlying ``MCPToolset`` so tools and
-        resources share one connection.
+        resources share one connection, and its tools are prefixed per server so
+        several such servers can be active at once.
         """
         servers: list[AbstractToolset[Any]] = []
         for config in self._configs.values():
@@ -423,12 +436,11 @@ class MCPRegistry:
                 make_resilient(_apply_tool_prefix(raw, config), config.name, on_degraded)
             )
             if config.include_resources or config.include_skills:
-                from pydantic_deep.mcp.resources import create_mcp_resources_toolset
-
                 resources = create_mcp_resources_toolset(
                     cast("Any", raw),
                     server_name=config.name,
                     include_skills=config.include_skills,
+                    tool_prefix=_resources_tool_prefix(config),
                 )
                 servers.append(make_resilient(resources, config.name, on_degraded))
         return servers

@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **MCP resources and `skill://` skills are now visible to the model** ([#180](https://github.com/vstorm-co/pydantic-deepagents/pull/180), closes [#178](https://github.com/vstorm-co/pydantic-deepagents/issues/178)) (`pydantic_deep/mcp/resources.py`, `pydantic_deep/mcp/registry.py`, `pydantic_deep/mcp/config.py`, `pydantic_deep/mcp/loader.py`). pydantic-ai surfaces only an MCP server's *tools*, so a server publishing skills through FastMCP's `SkillsDirectoryProvider` was unreachable from a delegated agent unless the app hand-rolled a bridge. Set `include_resources` / `include_skills` on an `MCPServerConfig` (or in the `mcpServers` JSON) and `MCPRegistry.build_active()` attaches a second toolset with `list_mcp_resources` / `read_mcp_resource` and, for skills, `list_mcp_skills` / `load_mcp_skill`. It binds to the same `MCPToolset`, so tools and resources share one connection and one resource cache. Both flags default to off.
+  - The resource tools are prefixed per server (the config's `tool_prefix`, else its name), so several servers can expose their resources in the same run — without a prefix their identical tool names collide and pydantic-ai fails the run.
+  - With `include_skills`, the server's skills are listed in the system prompt, so the model knows the guidance exists before it starts calling the server's operational tools.
+  - An unreachable server returns the failure as tool text rather than raising out of `agent.run()`, matching how `make_resilient` degrades the tools toolset.
+  - New export: `create_mcp_resources_toolset` (also `MCPResourceProvider`, `SKILL_URI_SCHEME`, `SKILL_DOC_NAME` from `pydantic_deep.mcp`).
+
 ## [0.3.37] - 2026-07-22
 
 A CLI paste fix and raised floors on the vstorm-co packages, bringing backend

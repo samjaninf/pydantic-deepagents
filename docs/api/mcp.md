@@ -43,8 +43,23 @@ mcp_servers = registry.build_active()  # tools toolset + resources toolset
 
 The resources toolset adds `list_mcp_resources` / `read_mcp_resource`, plus
 `list_mcp_skills` / `load_mcp_skill` when `include_skills` is set. It binds to the
-same underlying `MCPToolset`, so tools and resources share one connection. Use
-`create_mcp_resources_toolset` directly to wrap a server you built yourself.
+same underlying `MCPToolset`, so tools and resources share one connection.
+
+Every server's tools carry a prefix, so the example above registers
+`service_list_mcp_skills`, `service_load_mcp_skill` and so on. The prefix is the
+server's `tool_prefix` when set, otherwise its name — without it, two servers
+exposing their resources would register identical tool names and pydantic-ai
+would reject the collision and fail the run.
+
+With `include_skills` the toolset also lists the server's skills in the system
+prompt, so the model knows the guidance exists before it reaches for the server's
+operational tools rather than having to go looking for it.
+
+A server that is unreachable degrades the same way its tools do: these tools
+return the error as text instead of raising out of `agent.run()`.
+
+Use `create_mcp_resources_toolset` directly to wrap a server you built yourself —
+pass `tool_prefix` if more than one server will expose its resources.
 
 ::: pydantic_deep.mcp.create_mcp_resources_toolset
     options:
