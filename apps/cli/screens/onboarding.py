@@ -30,11 +30,9 @@ def _check_provider_status() -> list[tuple[str, str, str, bool]]:
 
     result: list[tuple[str, str, str, bool]] = []
     for provider_id, name, env_var, _url in _PROVIDERS:
-        has_key = (
-            bool(os.environ.get(env_var))
-            if env_var
-            else provider_id in ("ollama", "openai-compatible")
-        )
+        # No env var means a keyless provider (Ollama, a local OpenAI-compatible
+        # endpoint): there is nothing to check, so it is always ready.
+        has_key = bool(os.environ.get(env_var)) if env_var else True
         result.append((provider_id, name, env_var, has_key))
     return result
 
@@ -240,6 +238,12 @@ class LocalEndpointModal(ModalScreen[str | None]):
         base_url = self.query_one("#local-url", Input).value.strip()
         if not base_url:
             self.app.notify("Please enter a base URL", severity="warning")
+            return
+        if not base_url.startswith(("http://", "https://")):
+            # A scheme-less URL (e.g. the `localhost:8080` a llama.cpp log prints)
+            # builds a provider fine and only fails on the first message, with an
+            # httpx protocol error that reads like an agent bug. Catch it here.
+            self.app.notify("Base URL must start with http:// or https://", severity="warning")
             return
         name = self.query_one("#local-model", Input).value.strip() or "local-model"
         api_key = self.query_one("#local-key", Input).value.strip()

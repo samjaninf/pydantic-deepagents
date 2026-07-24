@@ -2,15 +2,14 @@
 
 from __future__ import annotations
 
-import os
 from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic_ai_backends import LocalBackend
 
-from apps.cli.config import CliConfig, load_config
-from apps.cli.providers import OPENAI_COMPATIBLE_API_KEY_ENV, OPENAI_COMPATIBLE_PREFIX
+from apps.cli.config import load_config
+from apps.cli.model_resolve import resolve_cli_model
 from apps.cli.reminder import _build_reminder_config
 from pydantic_deep.agent import create_deep_agent
 from pydantic_deep.deps import DeepAgentDeps
@@ -20,7 +19,7 @@ from pydantic_deep.features.message_queue import MessageQueue
 from pydantic_deep.prompts import build_system_prompt
 
 if TYPE_CHECKING:
-    from pydantic_ai.models.openai import OpenAIChatModel
+    from pydantic_ai.models import Model
 
 
 def _detect_fork_test_command(backend: Any) -> str | None:
@@ -114,33 +113,9 @@ def _make_shell_allow_list_hook(allow_list: list[str]) -> Hook:
     )
 
 
-def _resolve_openai_compatible_model(model_str: str, config: CliConfig) -> OpenAIChatModel:
-    """Turn an `openai-compatible:<name>` model string into an `OpenAIChatModel`.
-
-    Local servers (llama.cpp, LM Studio, vLLM, …) speak the OpenAI wire format but
-    need a `base_url`, which a plain model string can't carry — so the CLI stores
-    the URL in `config.base_url` and marks the model with a sentinel prefix. The
-    API key comes from the keystore (`OPENAI_COMPATIBLE_API_KEY`), never from
-    `config.toml`; most local servers ignore it, so a noop stand-in is used when
-    none is set.
-    """
-    from pydantic_ai.models.openai import OpenAIChatModel
-    from pydantic_ai.providers.openai import OpenAIProvider
-
-    if not config.base_url:
-        raise ValueError(
-            "No base_url configured for the OpenAI-compatible endpoint. "
-            "Run /provider, pick OpenAI-compatible, and enter the server URL."
-        )
-    name = model_str[len(OPENAI_COMPATIBLE_PREFIX) :] or "local-model"
-    api_key = os.environ.get(OPENAI_COMPATIBLE_API_KEY_ENV) or "sk-noop"
-    provider = OpenAIProvider(base_url=config.base_url, api_key=api_key)
-    return OpenAIChatModel(name, provider=provider)
-
-
 def create_cli_agent(  # noqa: C901
-    model: str | None = None,
-    fallback_model: str | None = None,
+    model: str | Model | None = None,
+    fallback_model: str | Model | None = None,
     working_dir: str | None = None,
     shell_allow_list: list[str] | None = None,
     on_cost_update: Any | None = None,
@@ -475,13 +450,16 @@ def create_cli_agent(  # noqa: C901
         except Exception:
             mcp_servers = []
 
-    model_for_agent: str | OpenAIChatModel = effective_model
-    if isinstance(effective_model, str) and effective_model.startswith(OPENAI_COMPATIBLE_PREFIX):
-        model_for_agent = _resolve_openai_compatible_model(effective_model, config)
+    # Both go through the resolver: the `openai-compatible:` sentinel is a CLI
+    # concept pydantic-ai can't infer, and a local endpoint is as valid a
+    # fallback as it is a primary.
+    model_for_agent = resolve_cli_model(effective_model, config)
+    raw_fallback = fallback_model or config.fallback_model or None
+    fallback_for_agent = resolve_cli_model(raw_fallback, config) if raw_fallback else None
 
     agent = create_deep_agent(
         model=model_for_agent,
-        fallback_model=fallback_model or config.fallback_model or None,
+        fallback_model=fallback_for_agent,
         instructions=instructions,
         backend=effective_backend,
         skill_directories=skill_dirs if effective_skills else None,

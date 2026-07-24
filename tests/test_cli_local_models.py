@@ -8,10 +8,21 @@ from typing import Any
 import pytest
 from pydantic_ai.models.openai import OpenAIChatModel
 
-from apps.cli.agent import _resolve_openai_compatible_model, create_cli_agent
+from apps.cli.agent import create_cli_agent
 from apps.cli.app import DeepApp
 from apps.cli.config import CliConfig
+from apps.cli.model_resolve import resolve_cli_model, resolve_openai_compatible_model
 from apps.cli.providers import OPENAI_COMPATIBLE_PREFIX, PROVIDER_DEFAULT_MODELS, PROVIDERS
+
+
+def _patch_load_config(monkeypatch: pytest.MonkeyPatch, config: CliConfig) -> None:
+    """Pin the config every on-demand `load_config()` call sees.
+
+    `model_resolve` binds the name at import time, so patching only
+    `apps.cli.config.load_config` would miss it.
+    """
+    monkeypatch.setattr("apps.cli.config.load_config", lambda *_a, **_k: config)
+    monkeypatch.setattr("apps.cli.model_resolve.load_config", lambda *_a, **_k: config)
 
 
 class TestProviderTable:
@@ -30,30 +41,58 @@ class TestProviderTable:
 class TestResolveOpenAICompatibleModel:
     def test_happy_path_builds_openai_chat_model(self) -> None:
         cfg = CliConfig(base_url="http://localhost:8080/v1")
-        model = _resolve_openai_compatible_model("openai-compatible:qwen2.5", cfg)
+        model = resolve_openai_compatible_model("openai-compatible:qwen2.5", cfg)
         assert isinstance(model, OpenAIChatModel)
         assert model.model_name == "qwen2.5"
+        # The whole point of the feature: the configured endpoint is what the
+        # client talks to.
+        assert str(model.base_url) == "http://localhost:8080/v1/"
 
     def test_empty_name_defaults_to_local_model(self) -> None:
         cfg = CliConfig(base_url="http://localhost:8080/v1")
-        model = _resolve_openai_compatible_model("openai-compatible:", cfg)
+        model = resolve_openai_compatible_model("openai-compatible:", cfg)
         assert model.model_name == "local-model"
 
     def test_missing_base_url_raises(self) -> None:
         with pytest.raises(ValueError, match="No base_url"):
-            _resolve_openai_compatible_model("openai-compatible:x", CliConfig())
+            resolve_openai_compatible_model("openai-compatible:x", CliConfig())
 
     def test_api_key_read_from_keystore_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("OPENAI_COMPATIBLE_API_KEY", "lm-studio")
         cfg = CliConfig(base_url="http://localhost:1234/v1")
-        model = _resolve_openai_compatible_model("openai-compatible:phi", cfg)
-        assert isinstance(model, OpenAIChatModel)
+        model = resolve_openai_compatible_model("openai-compatible:phi", cfg)
+        assert model.client.api_key == "lm-studio"
 
-    def test_no_api_key_still_builds_with_noop(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_no_api_key_uses_noop_never_the_openai_key(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         monkeypatch.delenv("OPENAI_COMPATIBLE_API_KEY", raising=False)
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-the-users-real-openai-key")
         cfg = CliConfig(base_url="http://localhost:1234/v1")
-        model = _resolve_openai_compatible_model("openai-compatible:phi", cfg)
+        model = resolve_openai_compatible_model("openai-compatible:phi", cfg)
+        # `OpenAIProvider` would fall back to OPENAI_API_KEY if we passed none;
+        # the user's real key must never be sent to an arbitrary endpoint.
+        assert model.client.api_key == "sk-noop"
+
+
+class TestResolveCliModel:
+    def test_plain_model_string_passes_through(self) -> None:
+        assert resolve_cli_model("anthropic:claude-sonnet-4-6") == "anthropic:claude-sonnet-4-6"
+
+    def test_ollama_is_not_treated_as_local_endpoint(self) -> None:
+        assert resolve_cli_model("ollama:llama3.3") == "ollama:llama3.3"
+
+    def test_sentinel_is_converted(self) -> None:
+        cfg = CliConfig(base_url="http://localhost:8080/v1")
+        model = resolve_cli_model("openai-compatible:qwen2.5", cfg)
         assert isinstance(model, OpenAIChatModel)
+        assert model.model_name == "qwen2.5"
+
+    def test_config_is_loaded_on_demand_when_omitted(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        _patch_load_config(monkeypatch, CliConfig(base_url="http://localhost:9999/v1"))
+        model = resolve_cli_model("openai-compatible:phi")
+        assert isinstance(model, OpenAIChatModel)
+        assert str(model.base_url) == "http://localhost:9999/v1/"
 
 
 class _StopBuild(Exception):
@@ -66,20 +105,20 @@ class TestCreateCliAgentLocalModel:
         cfg.write_text(body)
         return cfg
 
-    def _capture_model_arg(
+    def _capture_agent_kwargs(
         self,
         monkeypatch: pytest.MonkeyPatch,
         *,
         model: str,
         tmp_path: Path,
         config_body: str,
-    ) -> object:
+    ) -> dict[str, object]:
         import apps.cli.agent as agent_mod
 
         captured: dict[str, object] = {}
 
         def spy(*_args: object, **kwargs: object) -> object:
-            captured["model"] = kwargs.get("model")
+            captured.update(kwargs)
             raise _StopBuild
 
         monkeypatch.setattr(agent_mod, "create_deep_agent", spy)
@@ -89,30 +128,58 @@ class TestCreateCliAgentLocalModel:
                 working_dir=str(tmp_path),
                 config_path=self._write_config(tmp_path, config_body),
             )
-        return captured["model"]
+        return captured
 
     def test_prefix_model_is_converted_to_instance(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        model = self._capture_model_arg(
+        kwargs = self._capture_agent_kwargs(
             monkeypatch,
             model="openai-compatible:qwen2.5",
             tmp_path=tmp_path,
             config_body='base_url = "http://localhost:8080/v1"\n',
         )
+        model = kwargs["model"]
         assert isinstance(model, OpenAIChatModel)
         assert model.model_name == "qwen2.5"
 
     def test_plain_string_model_not_converted(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        model = self._capture_model_arg(
+        kwargs = self._capture_agent_kwargs(
             monkeypatch,
             model="anthropic:claude-sonnet-4-6",
             tmp_path=tmp_path,
             config_body="",
         )
-        assert model == "anthropic:claude-sonnet-4-6"
+        assert kwargs["model"] == "anthropic:claude-sonnet-4-6"
+
+    def test_prefix_fallback_model_is_converted_too(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A local endpoint is as valid a fallback as it is a primary — passing
+        the raw sentinel through would crash in `infer_model`."""
+        kwargs = self._capture_agent_kwargs(
+            monkeypatch,
+            model="anthropic:claude-sonnet-4-6",
+            tmp_path=tmp_path,
+            config_body=(
+                'base_url = "http://localhost:8080/v1"\n'
+                'fallback_model = "openai-compatible:qwen2.5"\n'
+            ),
+        )
+        fallback = kwargs["fallback_model"]
+        assert isinstance(fallback, OpenAIChatModel)
+        assert fallback.model_name == "qwen2.5"
+
+    def test_no_fallback_stays_none(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        kwargs = self._capture_agent_kwargs(
+            monkeypatch,
+            model="anthropic:claude-sonnet-4-6",
+            tmp_path=tmp_path,
+            config_body="",
+        )
+        assert kwargs["fallback_model"] is None
 
 
 class TestLocalEndpointModal:
@@ -169,6 +236,26 @@ class TestLocalEndpointModal:
             modal._save_and_dismiss()
             await pilot.pause()
         assert result == ["openai-compatible:local-model"]
+
+    async def test_schemeless_url_warns_and_stays_open(self, app: DeepApp) -> None:
+        """`localhost:8080/v1` is what a llama.cpp log prints; without a scheme
+        it only fails on the first message, deep inside httpx."""
+        from textual.widgets import Input
+
+        from apps.cli.screens.onboarding import LocalEndpointModal
+
+        result: list[str | None] = []
+        modal = LocalEndpointModal()
+        async with app.run_test(size=(120, 40)) as pilot:
+            await app.push_screen(modal, lambda r: result.append(r))
+            await pilot.pause()
+            modal.query_one("#local-url", Input).value = "localhost:8080/v1"
+            modal._save_and_dismiss()
+            await pilot.pause()
+            assert result == []
+            modal.action_cancel()
+            await pilot.pause()
+        assert result == [None]
 
     async def test_blank_url_warns_and_stays_open(self, app: DeepApp) -> None:
         from apps.cli.screens.onboarding import LocalEndpointModal
@@ -303,14 +390,14 @@ class TestPickAvailableModel:
 
 class TestReminderModelWiring:
     """The LLM reminder generator must receive the resolved model, not the raw
-    `openai-compatible:...` string."""
+    `openai-compatible:...` string — at startup *and* on the live mode switch."""
 
     def test_build_reminder_config_accepts_model_instance(self) -> None:
         from apps.cli.reminder import _build_reminder_config
         from pydantic_deep.features.periodic_reminder import LLMReminderGenerator
 
         cfg = CliConfig(base_url="http://localhost:8080/v1")
-        model = _resolve_openai_compatible_model("openai-compatible:qwen2.5", cfg)
+        model = resolve_openai_compatible_model("openai-compatible:qwen2.5", cfg)
         reminder_cfg = _build_reminder_config(
             periodic_reminder=True,
             reminder_mode="llm",
@@ -319,3 +406,65 @@ class TestReminderModelWiring:
         )
         assert isinstance(reminder_cfg.generator, LLMReminderGenerator)
         assert reminder_cfg.generator.model is model
+
+    def test_build_reminder_config_resolves_a_raw_sentinel(self) -> None:
+        from apps.cli.reminder import _build_reminder_config
+        from pydantic_deep.features.periodic_reminder import LLMReminderGenerator
+
+        cfg = CliConfig(model="openai-compatible:qwen2.5", base_url="http://localhost:8080/v1")
+        reminder_cfg = _build_reminder_config(
+            periodic_reminder=True, reminder_mode="llm", config=cfg
+        )
+        assert isinstance(reminder_cfg.generator, LLMReminderGenerator)
+        assert isinstance(reminder_cfg.generator.model, OpenAIChatModel)
+
+    def test_live_switch_resolves_the_apps_model_name(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """`/remind llm` rebuilds the generator from `app.model_name`, which
+        holds the raw CLI string."""
+        from apps.cli.reminder import _resolve_reminder_model
+
+        _patch_load_config(monkeypatch, CliConfig(base_url="http://localhost:8080/v1"))
+        app = DeepApp(model="openai-compatible:qwen2.5", version="0.0.0")
+        model = _resolve_reminder_model(app)
+        assert isinstance(model, OpenAIChatModel)
+        assert model.model_name == "qwen2.5"
+
+    def test_live_switch_leaves_a_normal_model_alone(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from apps.cli.reminder import _resolve_reminder_model
+
+        _patch_load_config(monkeypatch, CliConfig())
+        app = DeepApp(model="anthropic:claude-sonnet-4-6", version="0.0.0")
+        assert _resolve_reminder_model(app) == "anthropic:claude-sonnet-4-6"
+
+
+class TestGoalEvaluatorWiring:
+    def test_goal_evaluator_gets_the_resolved_model(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Without this the evaluator fails on every turn with
+        "Evaluator error; continuing." and the goal never completes."""
+        from apps.cli.goal import get_goal_evaluator
+
+        _patch_load_config(monkeypatch, CliConfig(base_url="http://localhost:8080/v1"))
+        app = DeepApp(model="openai-compatible:qwen2.5", version="0.0.0")
+        evaluator = get_goal_evaluator(app)
+        assert isinstance(evaluator.model, OpenAIChatModel)
+        assert evaluator.model.model_name == "qwen2.5"
+
+
+class TestCredentialRegistration:
+    def test_local_endpoint_key_is_manageable(self) -> None:
+        """`/provider` writes this key, so `keys list` / `keys set` / `/keys`
+        must be able to see and change it."""
+        from apps.cli.credentials import CREDENTIALS, find_credential
+
+        cred = find_credential("OPENAI_COMPATIBLE_API_KEY")
+        assert cred is not None
+        assert cred in CREDENTIALS
+
+    def test_local_endpoint_key_is_not_a_first_run_provider(self) -> None:
+        """It must stay out of the key-first onboarding list: the provider needs
+        a base URL, and picking it there would set a model with no endpoint."""
+        from apps.cli.onboarding_cli import _provider_credentials
+
+        assert all(c.env_var != "OPENAI_COMPATIBLE_API_KEY" for c in _provider_credentials())
