@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.39] - 2026-07-26
+
+The pre-`features/` import paths are gone.
+
+### Removed
+
+- **`pydantic_deep.toolsets`, `pydantic_deep.capabilities`, `pydantic_deep.processors` and `pydantic_deep.improve` are deleted** (`pydantic_deep/__init__.py`). Every feature moved into `pydantic_deep/features/<name>/` in 0.3.34, which said the old deep import paths would be removed in the next minor release; since then the four packages have been deprecation shims, re-exporting the moved names and warning on import. They are now removed — `features/` is the only import location.
+  - The blessed top-level surface is unchanged: `from pydantic_deep import SkillsToolset, HooksCapability, EvictionCapability, ...` still works, and `tests/test_public_api.py` (replacing `tests/test_feature_shims.py`) asserts each re-export is the same object as the one in its feature package.
+  - Deep imports must move to the feature package: `pydantic_deep.toolsets.memory` → `pydantic_deep.features.memory`, `pydantic_deep.capabilities.hooks` → `pydantic_deep.features.hooks`, `pydantic_deep.processors.eviction` → `pydantic_deep.features.eviction`, `pydantic_deep.improve` → `pydantic_deep.features.improve`, and likewise for `context`, `browser`, `skills`, `plan`, `teams`, `forking`, `checkpointing`, `liteparse`, `patch`, `history_archive`, `message_queue`, `stuck_loop`, `periodic_reminder`.
+  - Logger names follow the modules: code filtering on `pydantic_deep.capabilities.hooks` or `pydantic_deep.capabilities.periodic_reminder` should now use `pydantic_deep.features.hooks.capability` / `pydantic_deep.features.periodic_reminder.capability`.
+
+### Fixed
+
+- **`examples/skills_usage.py` discovery demos run again** (`examples/skills_usage.py`). `--discover` and `--load` imported `discover_skills` / `load_skill_instructions`, which stopped existing well before the reorg, so both modes died on `ImportError`. They now use `SkillsDirectory.get_skills()` and read `Skill` attributes instead of dict keys.
+
 ## [0.3.38] - 2026-07-24
 
 MCP resources and skills reach the model, the CLI talks to any

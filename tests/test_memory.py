@@ -749,6 +749,6 @@ class TestMemoryFailureSurfacing:
     def test_memory_access_error_exported(self):
         """MemoryAccessError is importable from the package root."""
         from pydantic_deep import MemoryAccessError
-        from pydantic_deep.toolsets.memory import MemoryAccessError as direct
+        from pydantic_deep.features.memory import MemoryAccessError as direct
 
         assert MemoryAccessError is direct
