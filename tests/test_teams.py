@@ -1230,3 +1230,41 @@ class TestTeamSubagentWiring:
         result = await team.tools["message_teammate"].function(ctx, "coder", "hello")
 
         assert "no running task" in result
+
+
+class TestSyncMemberEdgeCases:
+    """Branches in `assign` / `sync_member` that the happy path never reaches."""
+
+    async def test_assign_to_a_member_without_a_handle(self):
+        """`assign` before `spawn` still records the todo, with nothing to stamp."""
+        team = AgentTeam(name="t", members=[TeamMember("alice", "worker", "d", "i")])
+
+        item_id = await team.assign("alice", "Do the thing")
+
+        item = await team.shared_todos.get(item_id)
+        assert item is not None
+        assert item.assigned_to == "alice"
+        assert team._handles == {}
+
+    async def test_failed_member_does_not_reopen_a_completed_todo(self):
+        """Releasing a claim only applies to work still marked in progress.
+
+        A member whose task finished and was then marked failed must not resurrect
+        a completed todo as pending.
+        """
+        team = AgentTeam(
+            name="t",
+            members=[TeamMember("alice", "worker", "d", "i")],
+            task_manager=_FakeTaskManager(),
+        )
+        await team.spawn()
+        item_id = await team.assign("alice", "Do the thing")
+        await team.shared_todos.complete(item_id)
+
+        handle = team._handles["alice"]
+        handle.status = "failed"
+        await team.sync_member(handle)
+
+        item = await team.shared_todos.get(item_id)
+        assert item is not None
+        assert item.status == "completed"
