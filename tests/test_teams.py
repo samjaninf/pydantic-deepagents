@@ -1086,7 +1086,11 @@ class TestTeamSubagentWiring:
             context_manager=False,
             cost_tracking=False,
         )
-        toolsets = {ts.id: ts for ts in agent.toolsets if getattr(ts, "id", None)}
+        # `agent.toolsets` is typed as the abstract base; the concrete toolsets
+        # carry the `tools` / `registry` surface these assertions read.
+        toolsets: dict[str, Any] = {
+            ts_id: cast(Any, ts) for ts in agent.toolsets if (ts_id := ts.id) is not None
+        }
         subagents = toolsets.get("deep-subagents")
         team = toolsets.get("deep-team")
         assert subagents is not None
