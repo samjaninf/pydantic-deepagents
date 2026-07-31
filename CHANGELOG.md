@@ -5,6 +5,55 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.40] - 2026-08-01
+
+Agent teams were wired to the subagent execution engine but never actually ran a
+member. Four defects compounded, each of them silent: the tools reported success
+and the team produced nothing.
+
+Requires `subagents-pydantic-ai >= 0.2.12`, which adds the programmatic
+`answer_task` / `steer_task` surface and exposes `SubAgentToolset.registry`.
+
+### Fixed
+
+- **Teams registered members in a registry the subagent engine never reads.** With
+  `subagent_registry=None` — the `create_deep_agent` default — the team block built
+  a fresh `DynamicAgentRegistry()`, so `spawn_team` put its members somewhere the
+  subagent `task` tool does not look and every `assign_task` came back
+  `Error: Unknown subagent`. Teams plus subagents was broken in the default
+  configuration. Teams now share `subagent_toolset.registry`.
+- **A refused delegation was recorded as a started task.** The subagent `task` tool
+  reports an unknown subagent or a busy chat trace as an error string rather than
+  raising, so `assign_task`'s `except` never fired: it set the member to `running`
+  and appended the error to an "Agent running in background" message. The member
+  then sat at `running` forever. A started task is now identified by its `Task ID:`
+  line, and a refusal marks the member `failed` with the reason.
+- **`message_teammate` delivered nothing.** It wrote to `TeamMessageBus`, which no
+  running member reads — a member is a background subagent and only sees what the
+  subagent engine hands it, and `TeamMessageBus.receive()` is called from tests
+  only. It now routes through the engine: `answer_task` when the member is blocked
+  in `ask_parent`, `steer_task` while it runs, and it says plainly when there is
+  nothing to deliver into instead of reporting "Message sent".
+- **A finished member left its shared task `in_progress` forever**, so the lead read
+  completed work as outstanding. `AgentTeam.sync_member` completes the todo when a
+  member completes, and releases the claim when one fails so the lead can reassign
+  it rather than watching a dead member hold it.
+
+### Added
+
+- **`create_team_toolset(subagent_toolset=...)`** — the subagent toolset backing
+  execution, which is what makes `message_teammate` able to deliver. The existing
+  `registry` / `task_fn` / `task_manager` arguments still work.
+- **`TeamMemberHandle.todo_id`**, linking a member to the shared-todo item it
+  claimed so finishing the task can close the todo.
+- **`TestTeamSubagentWiring`** in `tests/test_teams.py`, which fails on each of the
+  four defects independently.
+
+### Changed
+
+- `TestCreateTeamToolset::test_message_teammate` asserted the `"Message sent"` that
+  the third defect shows was a lie; it now asserts the honest outcome.
+
 ## [0.3.39] - 2026-07-26
 
 The pre-`features/` import paths are gone.
