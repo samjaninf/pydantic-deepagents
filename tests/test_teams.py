@@ -1022,8 +1022,8 @@ class TestTeamsExports:
             ]
         )
 
-    def test_create_team_toolset_from_toolsets(self):
-        """create_team_toolset is importable from pydantic_deep.toolsets."""
-        from pydantic_deep.toolsets import create_team_toolset
+    def test_create_team_toolset_from_feature(self):
+        """create_team_toolset is importable from pydantic_deep.features.teams."""
+        from pydantic_deep.features.teams import create_team_toolset
 
         assert create_team_toolset is not None
