@@ -1157,14 +1157,21 @@ def create_deep_agent(  # noqa: C901
         # Wire teams to subagent execution engine when both are enabled
         _team_kwargs: dict[str, Any] = {}
         if include_subagents and _subagent_task_manager is not None:
+            # Teams must share the registry the subagent toolset resolves names
+            # against. Handing them a fresh `DynamicAgentRegistry()` registered
+            # members somewhere `task` never looks, so every `assign_task`
+            # returned "Unknown subagent" while the team reported it as running.
             _team_registry = subagent_registry
             if _team_registry is None:
+                _team_registry = getattr(subagent_toolset, "registry", None)
+            if _team_registry is None:  # pragma: no cover - older subagents build
                 _team_registry = DynamicAgentRegistry()
             _team_kwargs["registry"] = _team_registry
             _team_kwargs["task_manager"] = _subagent_task_manager
 
             # Get the task() tool function from the subagent toolset
             if subagent_toolset is not None:  # pragma: no branch
+                _team_kwargs["subagent_toolset"] = subagent_toolset
                 _task_tool = subagent_toolset.tools.get("task")
                 if _task_tool is not None:
                     _team_kwargs["task_fn"] = _task_tool.function
