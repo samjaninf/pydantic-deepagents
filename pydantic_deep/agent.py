@@ -89,6 +89,7 @@ from pydantic_deep.instructions import build_instruction_providers, render_instr
 from pydantic_deep.models import (
     DEFAULT_IMPROVE_MODEL,
     DEFAULT_MODEL,
+    DEFAULT_SUBAGENT_ASK_TIMEOUT_SECONDS,
     DEFAULT_SUMMARIZATION_MODEL,
 )
 from pydantic_deep.prompts import BASE_PROMPT
@@ -482,6 +483,7 @@ def create_deep_agent(
     subagent_registry: DynamicAgentRegistry | None = None,
     subagent_extra_toolsets: Sequence[AbstractToolset[Any]] | None = None,
     subagent_usage_limits: UsageLimits | UsageLimitsFactory | None = None,
+    subagent_ask_timeout_seconds: float = DEFAULT_SUBAGENT_ASK_TIMEOUT_SECONDS,
     include_execute: bool | None = None,
     interrupt_on: dict[str, bool] | None = None,
     output_type: None = None,
@@ -562,6 +564,7 @@ def create_deep_agent(
     subagent_registry: DynamicAgentRegistry | None = None,
     subagent_extra_toolsets: Sequence[AbstractToolset[Any]] | None = None,
     subagent_usage_limits: UsageLimits | UsageLimitsFactory | None = None,
+    subagent_ask_timeout_seconds: float = DEFAULT_SUBAGENT_ASK_TIMEOUT_SECONDS,
     include_execute: bool | None = None,
     interrupt_on: dict[str, bool] | None = None,
     *,
@@ -642,6 +645,7 @@ def create_deep_agent(  # noqa: C901
     subagent_registry: DynamicAgentRegistry | None = None,
     subagent_extra_toolsets: Sequence[AbstractToolset[Any]] | None = None,
     subagent_usage_limits: UsageLimits | UsageLimitsFactory | None = None,
+    subagent_ask_timeout_seconds: float = DEFAULT_SUBAGENT_ASK_TIMEOUT_SECONDS,
     include_execute: bool | None = None,
     interrupt_on: dict[str, bool] | None = None,
     output_type: OutputSpec[OutputDataT] | None = None,
@@ -766,6 +770,12 @@ def create_deep_agent(  # noqa: C901
             and a larger `request_limit` for heavy research/execution ones.
             `None` (default) leaves pydantic-ai's own default in place. Only
             takes effect when `include_subagents=True`.
+        subagent_ask_timeout_seconds: How long a subagent blocked in `ask_parent`
+            waits before giving up and finishing on its own judgment. Defaults to
+            60s rather than the library's 300s: a team member that asks while the
+            lead is not polling holds its slot for the whole timeout, and five
+            minutes of that reads as a hung agent. Raise it when a human is
+            reliably in the loop.
         include_execute: Whether to include the execute tool. If None (default),
             automatically determined based on whether backend is a SandboxProtocol.
             Set to True to force include even when backend is None (useful when
@@ -1089,6 +1099,7 @@ def create_deep_agent(  # noqa: C901
             max_nesting_depth=max_nesting_depth,
             registry=subagent_registry,
             usage_limits=subagent_usage_limits,
+            ask_timeout_seconds=subagent_ask_timeout_seconds,
         )
         all_toolsets.append(subagent_toolset)
         _subagent_task_manager = getattr(subagent_toolset, "task_manager", None)

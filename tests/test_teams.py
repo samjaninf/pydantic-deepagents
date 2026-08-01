@@ -1268,3 +1268,50 @@ class TestSyncMemberEdgeCases:
         item = await team.shared_todos.get(item_id)
         assert item is not None
         assert item.status == "completed"
+
+
+class TestSubagentAskTimeout:
+    """A team member that asks must not hold its slot for five minutes."""
+
+    def test_default_is_shortened_for_deep_agents(self):
+        """The library default is 300s; a member asking an unattended lead stalls."""
+        from pydantic_deep.models import DEFAULT_SUBAGENT_ASK_TIMEOUT_SECONDS
+
+        agent = create_deep_agent(
+            model=TEST_MODEL,
+            include_subagents=True,
+            include_teams=True,
+            include_filesystem=False,
+            include_todo=False,
+            include_skills=False,
+            include_plan=False,
+            include_monitoring=False,
+            context_manager=False,
+            cost_tracking=False,
+        )
+        toolsets: dict[str, Any] = {
+            ts_id: cast(Any, ts) for ts in agent.toolsets if (ts_id := ts.id) is not None
+        }
+
+        assert DEFAULT_SUBAGENT_ASK_TIMEOUT_SECONDS == 60.0
+        assert toolsets["deep-subagents"]._ask_timeout_seconds == 60.0
+
+    def test_callers_can_override_it(self):
+        agent = create_deep_agent(
+            model=TEST_MODEL,
+            include_subagents=True,
+            include_filesystem=False,
+            include_todo=False,
+            include_skills=False,
+            include_plan=False,
+            include_teams=False,
+            include_monitoring=False,
+            context_manager=False,
+            cost_tracking=False,
+            subagent_ask_timeout_seconds=5.0,
+        )
+        toolsets: dict[str, Any] = {
+            ts_id: cast(Any, ts) for ts in agent.toolsets if (ts_id := ts.id) is not None
+        }
+
+        assert toolsets["deep-subagents"]._ask_timeout_seconds == 5.0
