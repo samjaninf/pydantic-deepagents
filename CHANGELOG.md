@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.41] - 2026-08-01
+
+### Changed
+
+- **A subagent blocked in `ask_parent` now waits 60s, not 300s.**
+  `subagents-pydantic-ai` defaults to a five-minute wait, which a team member
+  inherits: one that asks a question while the lead is not polling holds its slot
+  for the whole timeout, and five minutes of that is indistinguishable from a hung
+  agent. After the timeout the subagent is told to proceed on its own judgment
+  rather than being cancelled, so the work still finishes.
+
+### Added
+
+- **`create_deep_agent(subagent_ask_timeout_seconds=...)`** and
+  `DEFAULT_SUBAGENT_ASK_TIMEOUT_SECONDS` (60.0), for raising the wait back up when
+  a human is reliably in the loop.
+
 ## [0.3.40] - 2026-08-01
 
 Agent teams were wired to the subagent execution engine but never actually ran a
